@@ -37,10 +37,10 @@ const NavBar = () => {
           <Link to={"/recircle"}>
             <div className="pr-4 pl-4 hover:text-orange-400 cursor-pointer">
               <div className="text-xs xl:text-sm flex items-center gap-1">
-                <ArrowPathIcon className="h-3 w-3 xl:h-4 xl:w-4" />
+                <ArrowPathIcon className="h-3 w-3 xl:h-4 xl:w-4 text-green-400" />
                 New
               </div>
-              <div className="text-sm xl:text-base font-bold">ReCircle</div>
+              <div className="text-sm xl:text-base text-green-400 font-bold">ReCircle</div>
             </div>
           </Link>
           <Link to={"/checkout"}>

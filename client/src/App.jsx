@@ -5,6 +5,7 @@ import {
   Checkout,
   SearchResults,
   ProductPage,
+  ReCircleLayout,
 } from "./components";
 import {
   ReCirclePage,
@@ -13,6 +14,7 @@ import {
   PassportPage,
   PreventionPage,
   SustainabilityPage,
+  ReturnedProductsPage,
 } from "./pages";
 
 const App = () => {
@@ -21,12 +23,15 @@ const App = () => {
       <NavBar />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/recircle" element={<ReCirclePage />} />
-        <Route path="/ai-grading" element={<AIGradingPage />} />
-        <Route path="/routing" element={<RoutingPage />} />
-        <Route path="/passport" element={<PassportPage />} />
-        <Route path="/prevention" element={<PreventionPage />} />
-        <Route path="/sustainability" element={<SustainabilityPage />} />
+        <Route element={<ReCircleLayout />}>
+          <Route path="/recircle" element={<ReCirclePage />} />
+          <Route path="/recircle/returns-today" element={<ReturnedProductsPage />} />
+          <Route path="/ai-grading" element={<AIGradingPage />} />
+          <Route path="/routing" element={<RoutingPage />} />
+          <Route path="/passport" element={<PassportPage />} />
+          <Route path="/prevention" element={<PreventionPage />} />
+          <Route path="/sustainability" element={<SustainabilityPage />} />
+        </Route>
         <Route path="/search" element={<SearchResults />} />
         <Route path="/product/:id" element={<ProductPage />} />
         <Route path="/checkout" element={<Checkout />} />
