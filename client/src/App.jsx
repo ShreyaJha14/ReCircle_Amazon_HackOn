@@ -16,7 +16,7 @@ import {
   SustainabilityPage,
   ReturnedProductsPage,
 } from "./pages";
-
+import MyImpactPage from "./pages/MyImpactPage";
 const App = () => {
   return (
     <BrowserRouter>
@@ -31,6 +31,7 @@ const App = () => {
           <Route path="/passport" element={<PassportPage />} />
           <Route path="/prevention" element={<PreventionPage />} />
           <Route path="/sustainability" element={<SustainabilityPage />} />
+          <Route path="/my-impact" element={<MyImpactPage />} />
         </Route>
         <Route path="/search" element={<SearchResults />} />
         <Route path="/product/:id" element={<ProductPage />} />
