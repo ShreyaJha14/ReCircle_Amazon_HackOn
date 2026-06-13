@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --color-amazonclone: #131A22;
+  --color-amazonclone-light_blue: #232F3E;
+  --color-amazonclone-orange: #FF9900;
+  --color-amazonclone-lightText: #E0E0E0;
+  --color-amazonclone-darkText: #111111;
+  --color-amazonclone-borderGray: #D5D5D5;
+}

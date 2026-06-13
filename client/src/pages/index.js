@@ -1,0 +1,6 @@
+export { default as ReCirclePage } from "./ReCirclePage";
+export { default as AIGradingPage } from "./AIGradingPage";
+export { default as RoutingPage } from "./RoutingPage";
+export { default as PassportPage } from "./PassportPage";
+export { default as PreventionPage } from "./PreventionPage";
+export { default as SustainabilityPage } from "./SustainabilityPage";
