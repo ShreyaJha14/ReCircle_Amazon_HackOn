@@ -15,7 +15,9 @@ import {
   PreventionPage,
   SustainabilityPage,
   ReturnedProductsPage,
+  ResellProductsPage,
 } from "./pages";
+import MyImpactPage from "./pages/MyImpactPage";
 
 const App = () => {
   return (
@@ -26,11 +28,13 @@ const App = () => {
         <Route element={<ReCircleLayout />}>
           <Route path="/recircle" element={<ReCirclePage />} />
           <Route path="/recircle/returns-today" element={<ReturnedProductsPage />} />
+          <Route path="/recircle/resale" element={<ResellProductsPage />} />
           <Route path="/ai-grading" element={<AIGradingPage />} />
           <Route path="/routing" element={<RoutingPage />} />
           <Route path="/passport" element={<PassportPage />} />
           <Route path="/prevention" element={<PreventionPage />} />
           <Route path="/sustainability" element={<SustainabilityPage />} />
+          <Route path="/my-impact" element={<MyImpactPage />} />
         </Route>
         <Route path="/search" element={<SearchResults />} />
         <Route path="/product/:id" element={<ProductPage />} />
