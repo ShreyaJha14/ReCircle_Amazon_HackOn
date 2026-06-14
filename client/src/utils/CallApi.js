@@ -43,12 +43,8 @@ export const listRecentItems = (limit = 20) =>
   axios.get(`${BASE_URL}/grading/items`, { ...config, params: { limit } }).then((r) => r.data);
 
 // ── Smart Routing ─────────────────────────────────────────────────────────────
-// ── Smart Routing ─────────────────────────────────────────────────────────────
 export const routeItem = (payload) =>
   axios.post(`${BASE_URL}/routing/decide`, payload, config).then((r) => r.data);
-
-export const getRoutingDecision = (decisionId) =>
-  axios.get(`${BASE_URL}/routing/decisions/${decisionId}`, config).then((r) => r.data);
 
 export const getRoutingMetrics = () =>
   axios.get(`${BASE_URL}/routing/metrics`, config).then((r) => r.data);
@@ -113,3 +109,6 @@ export const createListing = (payload) =>
 
 export const getNearbyMatches = (params = {}) =>
   axios.get(`${BASE_URL}/listings/nearby`, { ...config, params }).then((r) => r.data);
+
+export const updateListing = (listingId, payload) =>
+  axios.patch(`${BASE_URL}/listings/${listingId}`, payload, config).then((r) => r.data);

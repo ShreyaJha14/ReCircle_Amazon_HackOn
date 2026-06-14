@@ -1,12 +1,20 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
+import { motion } from "framer-motion";
+import {
+  PageHero,
+  FeatureCard,
+  AnimatedSection,
+  GlassCard,
+  StatCard,
+  FloatingBackground,
+} from "../components";
 
 const STATS = [
-  { value: 1.2, decimals: 1, suffix: "M", unit: "kg", label: "CO₂ saved this year", icon: "🌍" },
-  { value: 480, decimals: 0, suffix: "K", unit: "", label: "Items diverted from landfill", icon: "♻️" },
-  { value: 92, decimals: 0, suffix: "%", unit: "", label: "Returns successfully re-routed", icon: "📦" },
-  { value: 840, decimals: 0, suffix: "Cr", unit: "", prefix: "₹", label: "Value recovered for customers", icon: "💰" },
+  { value: 1.2, decimals: 1, suffix: "M kg", label: "CO₂ saved this year", icon: "🌍", accent: "emerald-400" },
+  { value: 480, decimals: 0, suffix: "K", label: "Items diverted from landfill", icon: "♻️", accent: "teal-400" },
+  { value: 92, decimals: 0, suffix: "%", label: "Returns successfully re-routed", icon: "📦", accent: "orange-400" },
+  { value: 840, decimals: 0, prefix: "₹", suffix: " Cr", label: "Value recovered for customers", icon: "💰", accent: "yellow-400" },
 ];
 
 const STORIES = [
@@ -16,6 +24,7 @@ const STORIES = [
     headline: "Saved 15 kg CO₂",
     body: "By reselling her old laptop through ReCircle instead of discarding it.",
     tag: "Electronics",
+    tagColor: "emerald",
   },
   {
     img: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&auto=format&fit=crop&q=60",
@@ -23,6 +32,7 @@ const STORIES = [
     headline: "Diverted 5 items from landfill",
     body: "Donated a baby monitor and 4 outgrown appliances, earning 600 Green Credits.",
     tag: "Donations",
+    tagColor: "teal",
   },
   {
     img: "https://images.unsplash.com/photo-1558694924-78bf8ba63670?w=600&auto=format&fit=crop&q=60",
@@ -30,6 +40,7 @@ const STORIES = [
     headline: "Earned ₹12,000 from returns",
     body: "Sold 3 returned smartphones via P2P Resell in under 48 hours each.",
     tag: "P2P Resell",
+    tagColor: "orange",
   },
 ];
 
@@ -52,265 +63,297 @@ const ARTICLES = [
 ];
 
 const MONTHLY_CO2 = [40, 55, 48, 62, 70, 65, 78, 85, 80, 92, 88, 96];
+const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
 
-// Hook: trigger once when element scrolls into view (with mount fallback)
-const useInView = (options = { threshold: 0.1 }) => {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === "undefined") {
-      setInView(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setInView(true);
-        observer.disconnect();
-      }
-    }, options);
-    observer.observe(el);
-
-    // Fallback: element may already be in view on mount
-    const rect = el.getBoundingClientRect();
-    if (rect.top < window.innerHeight && rect.bottom > 0) {
-      setInView(true);
-      observer.disconnect();
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
-  return [ref, inView];
-};
-
-// Count-up number component
-const CountUp = ({ to, decimals = 0, duration = 1500, start, prefix = "", suffix = "" }) => {
-  const [value, setValue] = useState(0);
-
-  useEffect(() => {
-    if (!start) return;
-    let startTime = null;
-    let rafId;
-
-    const step = (timestamp) => {
-      if (startTime === null) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      // ease-out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(to * eased);
-      if (progress < 1) {
-        rafId = requestAnimationFrame(step);
-      }
-    };
-
-    rafId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafId);
-  }, [start, to, duration]);
-
-  return (
-    <span>
-      {prefix}
-      {value.toFixed(decimals)}
-      {suffix}
-    </span>
-  );
+const tagColorMap = {
+  emerald: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  teal: "bg-teal-500/20 text-teal-300 border-teal-500/30",
+  orange: "bg-orange-500/20 text-orange-300 border-orange-500/30",
 };
 
 const SustainabilityPage = () => {
   const navigate = useNavigate();
-  const auth     = useSelector((s) => s.auth);
-  const user     = auth?.user;
-  const credits  = user?.greenCredits ?? 0;
-  const [statsRef, statsInView] = useInView({ threshold: 0.3 });
-  const [chartRef, chartInView] = useInView({ threshold: 0.3 });
+  const auth = useSelector((s) => s.auth);
+  const user = auth?.user;
+  const credits = user?.greenCredits ?? 0;
 
   return (
-    <div className="bg-[#f3f3f3] font-sans min-h-screen">
-      <div className="min-w-[1000px] max-w-[1500px] m-auto">
+    <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 min-h-screen relative">
+      <div className="min-w-[1000px] max-w-[1500px] m-auto p-6 relative">
+        <FloatingBackground variant="grid" />
 
-        {/* ── HERO ── */}
-        <div className="relative h-[340px] overflow-hidden">
-          <img
-            src="https://plus.unsplash.com/premium_photo-1668671072689-c30ac7379611?w=1200&auto=format&fit=crop&q=70"
-            alt="Amazon Sustainability"
-            className="w-full h-full object-cover object-center"
+        <div className="relative z-10">
+
+          {/* ── HERO ── */}
+          <PageHero
+            eyebrow="Amazon ReCircle · Sustainability Hub"
+            title={
+              <>
+                Give Products{" "}
+                <span className="text-emerald-400">A Second Life</span>
+              </>
+            }
+            subtitle="Every refurbished, reused, and recycled product contributes to a greener future. See the impact we're building together."
+            actions={
+              <>
+                <button
+                  onClick={() => navigate("/my-impact")}
+                  className="bg-[#FF9900] hover:bg-[#E47911] text-[#111] font-bold px-6 py-2.5 rounded-lg text-sm transition-colors"
+                >
+                  View My Impact →
+                </button>
+                <button
+                  onClick={() => navigate("/recircle")}
+                  className="border border-white/20 hover:border-emerald-400/50 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-colors bg-white/5 hover:bg-white/10"
+                >
+                  Explore ReCircle
+                </button>
+              </>
+            }
+            visual={
+              <GlassCard className="p-6 flex flex-col gap-4 justify-center" hover={false}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold text-white">Global CO₂ Saved</span>
+                  <span className="text-xs text-emerald-400 font-semibold">↑ 140% YoY</span>
+                </div>
+                {/* Mini bar chart preview */}
+                <div className="flex items-end gap-1.5 h-20">
+                  {MONTHLY_CO2.map((v, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ height: 0 }}
+                      animate={{ height: `${v}%` }}
+                      transition={{ duration: 0.6, delay: 0.05 * i, ease: "easeOut" }}
+                      className="flex-1 rounded-t bg-gradient-to-t from-emerald-700 to-emerald-400 min-h-[4px]"
+                    />
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-1">
+                  {[
+                    { label: "Items Diverted", val: "480K" },
+                    { label: "Re-route Rate", val: "92%" },
+                  ].map((m) => (
+                    <div key={m.label} className="rounded-xl bg-white/5 border border-white/10 p-3 text-center">
+                      <div className="text-xl font-bold text-[#FF9900]">{m.val}</div>
+                      <div className="text-xs text-white/50 mt-0.5">{m.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
+            }
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#131921]/90 via-[#131921]/60 to-transparent" />
-          <div className="absolute inset-0 flex items-center px-10">
-            <div className="text-white max-w-xl">
-              <span className="inline-block bg-green-700 text-white text-xs font-bold px-3 py-1 rounded-full tracking-widest uppercase mb-4">
-                Amazon ReCircle
-              </span>
-              <h1 className="text-5xl font-bold leading-tight mb-4">
-                Give Products<br />
-                <span className="text-green-400">A Second Life</span>
-              </h1>
-              <p className="text-gray-300 text-base">
-                Every refurbished, reused, and recycled product contributes to a greener future.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* ── BREADCRUMB BAR ── */}
-        <div className="bg-[#232F3E] px-8 py-2 flex items-center gap-2">
-          <span className="text-gray-400 text-xs">You are here:</span>
-          <span className="text-[#FF9900] text-xs font-bold">Sustainability Hub</span>
-          <span className="text-gray-600 mx-1">›</span>
-          <span className="text-white text-xs">ReCircle Impact</span>
-        </div>
-
-        <div className="p-6 space-y-8">
 
           {/* ── STAT CARDS ── */}
-          <div ref={statsRef} className="grid grid-cols-4 gap-4">
-            {STATS.map((s) => (
-              <div key={s.label} className="bg-white border border-gray-200 rounded-lg p-5 text-center hover:shadow-md transition-all duration-200 hover:-translate-y-1 group">
-                <div className="text-3xl mb-2">{s.icon}</div>
-                <div className="text-3xl font-black text-green-700">
-                  <CountUp
-                    to={s.value}
-                    decimals={s.decimals}
-                    start={statsInView}
-                    prefix={s.prefix || ""}
-                    suffix={s.suffix || ""}
-                  />
-                  {s.unit && <span className="text-xl ml-1">{s.unit}</span>}
-                </div>
-                <div className="text-xs text-gray-500 mt-2 leading-snug">{s.label}</div>
-              </div>
+          <AnimatedSection className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
+            {STATS.map((s, i) => (
+              <StatCard
+                key={s.label}
+                value={s.value}
+                decimals={s.decimals}
+                prefix={s.prefix || ""}
+                suffix={s.suffix}
+                label={s.label}
+                icon={s.icon}
+                accent={s.accent}
+                delay={i * 0.08}
+              />
             ))}
-          </div>
+          </AnimatedSection>
 
           {/* ── PERSONAL IMPACT CTA ── */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6 flex items-center justify-between gap-8">
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 rounded-full bg-green-700 flex items-center justify-center text-white text-3xl flex-shrink-0">
-                🌱
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-[#111] mb-1">
-                  Track Your Personal Sustainability Journey
-                </h2>
-                <p className="text-sm text-gray-600">
-                  See how your choices contribute to a greener future. View your CO₂ savings, green credits, and milestone achievements.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 flex-shrink-0">
-              {/* Green credits badge near user profile */}
-              {user && (
-                <div
-                  onClick={() => navigate("/my-impact")}
-                  className="cursor-pointer bg-[#131921] border border-green-700 rounded-xl px-5 py-3 text-center hover:border-green-400 transition-colors"
-                >
-                  <div className="text-2xl font-black text-green-400">{credits}</div>
-                  <div className="text-xs text-green-300 font-bold">Green Credits</div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">≈ ₹{Math.floor(credits * 0.1)} off</div>
+          <AnimatedSection className="mb-10">
+            <GlassCard className="p-6 flex items-center justify-between gap-8" hover={false}>
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-3xl flex-shrink-0">
+                  🌱
                 </div>
-              )}
-              <button
-                onClick={() => navigate("/my-impact")}
-                className="bg-[#FF9900] hover:bg-[#E47911] text-[#111] font-bold px-8 py-3 rounded text-sm transition-colors whitespace-nowrap"
-              >
-                View My Impact →
-              </button>
+                <div>
+                  <h2 className="text-lg font-bold text-white mb-1">
+                    Track Your Personal Sustainability Journey
+                  </h2>
+                  <p className="text-sm text-white/60">
+                    See how your choices contribute to a greener future. View your CO₂ savings, green credits, and milestone achievements.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 flex-shrink-0">
+                {user && (
+                  <div
+                    onClick={() => navigate("/my-impact")}
+                    className="cursor-pointer rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-center hover:border-emerald-400/60 hover:bg-emerald-500/20 transition-all"
+                  >
+                    <div className="text-2xl font-black text-emerald-400">{credits}</div>
+                    <div className="text-xs text-emerald-300 font-bold">Green Credits</div>
+                    <div className="text-[10px] text-white/40 mt-0.5">≈ ₹{Math.floor(credits * 0.1)} off</div>
+                  </div>
+                )}
+                <button
+                  onClick={() => navigate("/my-impact")}
+                  className="bg-[#FF9900] hover:bg-[#E47911] text-[#111] font-bold px-7 py-3 rounded-lg text-sm transition-colors whitespace-nowrap"
+                >
+                  View My Impact →
+                </button>
+              </div>
+            </GlassCard>
+          </AnimatedSection>
+
+          {/* ── WHAT WE DO FEATURES ── */}
+          <AnimatedSection className="mb-10">
+            <h2 className="text-xl xl:text-2xl font-bold text-white mb-6">How We Make It Happen</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1">
+              <FeatureCard
+                icon="♻️"
+                title="Circular Routing"
+                description="Returned items are automatically assessed and routed to the best second-life outcome — resale, refurbishment, donation, or responsible recycling."
+                delay={0}
+              />
+              <FeatureCard
+                icon="🤖"
+                title="AI-Verified Quality"
+                description="Every product is graded by AI so buyers know exactly what they're getting and waste from uncertainty is eliminated."
+                delay={0.05}
+              />
+              <FeatureCard
+                icon="🌱"
+                title="Green Credits"
+                description="Earn rewards every time you choose a sustainable action — resell, donate, or recycle — turning green choices into real savings."
+                delay={0.1}
+              />
             </div>
-          </div>
+          </AnimatedSection>
 
           {/* ── CARBON SAVINGS CHART ── */}
-          <div ref={chartRef} className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-lg font-bold text-[#111] pb-2 border-b border-gray-300 mb-4">
-              Carbon Saved — Monthly Trend
-            </h2>
-            <div className="flex items-end gap-2" style={{ height: "160px" }}>
-              {MONTHLY_CO2.map((v, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
-                  <div
-                    className="w-full rounded-t bg-gradient-to-t from-green-700 to-green-400"
-                    style={{
-                      height: chartInView ? `${v}%` : "2%",
-                      minHeight: "4px",
-                      transition: `height 800ms cubic-bezier(0.22, 1, 0.36, 1)`,
-                      transitionDelay: `${i * 80}ms`,
-                    }}
-                  />
-                  <span className="text-[9px] text-gray-400">
-                    {["J","F","M","A","M","J","J","A","S","O","N","D"][i]}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400 mt-2">Jan – Dec · trending up 140% YoY</p>
-          </div>
+          <AnimatedSection className="mb-10">
+            <GlassCard className="p-6" hover={false}>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-bold text-white">Carbon Saved — Monthly Trend</h2>
+                <span className="text-xs text-emerald-400 font-semibold bg-emerald-400/10 border border-emerald-400/20 px-3 py-1 rounded-full">
+                  ↑ 140% YoY
+                </span>
+              </div>
+              <div className="flex items-end gap-2" style={{ height: "160px" }}>
+                {MONTHLY_CO2.map((v, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
+                    <motion.div
+                      className="w-full rounded-t bg-gradient-to-t from-emerald-700 to-emerald-400"
+                      initial={{ height: "2%" }}
+                      whileInView={{ height: `${v}%` }}
+                      viewport={{ once: true }}
+                      transition={{
+                        duration: 0.8,
+                        delay: i * 0.07,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                      style={{ minHeight: "4px" }}
+                    />
+                    <span className="text-[9px] text-white/40">{MONTHS[i]}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-white/30 mt-3">Jan – Dec · Platform-wide CO₂ reduction in tonnes</p>
+            </GlassCard>
+          </AnimatedSection>
 
           {/* ── CUSTOMER STORIES ── */}
-          <div>
-            <h2 className="text-lg font-bold text-[#111] pb-2 border-b border-gray-300 mb-4">
-              Customer Impact Stories
-            </h2>
+          <AnimatedSection className="mb-10">
+            <h2 className="text-xl xl:text-2xl font-bold text-white mb-6">Customer Impact Stories</h2>
             <div className="grid grid-cols-3 gap-4">
-              {STORIES.map((story) => (
-                <div key={story.name} className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200 hover:-translate-y-1 group cursor-pointer">
+              {STORIES.map((story, i) => (
+                <motion.div
+                  key={story.name}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  whileHover={{ y: -6, boxShadow: "0 20px 60px -10px rgba(255,153,0,0.2)" }}
+                  className="relative rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl overflow-hidden cursor-pointer hover:border-[#FF9900]/40 transition-colors duration-300 group"
+                >
                   <div className="relative h-44 overflow-hidden">
-                    <img src={story.img} alt={story.headline} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    <span className="absolute top-3 left-3 bg-green-700 text-white text-[10px] font-bold px-2 py-1 rounded">
+                    <img
+                      src={story.img}
+                      alt={story.headline}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {/* dark overlay so it feels part of dark theme */}
+                    <div className="absolute inset-0 bg-slate-950/30" />
+                    <span className={`absolute top-3 left-3 text-[10px] font-bold px-2 py-1 rounded border ${tagColorMap[story.tagColor]}`}>
                       {story.tag}
                     </span>
                   </div>
                   <div className="p-4">
-                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-1">{story.name}</p>
-                    <h3 className="font-bold text-sm text-[#111] mb-2">{story.headline}</h3>
-                    <p className="text-xs text-gray-600 leading-relaxed">{story.body}</p>
+                    <p className="text-xs text-white/40 font-semibold uppercase tracking-wide mb-1">{story.name}</p>
+                    <h3 className="font-bold text-sm text-white mb-2">{story.headline}</h3>
+                    <p className="text-xs text-white/60 leading-relaxed">{story.body}</p>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </AnimatedSection>
 
           {/* ── ARTICLES ── */}
-          <div>
-            <h2 className="text-lg font-bold text-[#111] pb-2 border-b border-gray-300 mb-4">
-              Our Sustainability Journey
-            </h2>
+          <AnimatedSection className="mb-10">
+            <h2 className="text-xl xl:text-2xl font-bold text-white mb-6">Our Sustainability Journey</h2>
             <div className="grid grid-cols-3 gap-4">
-              {ARTICLES.map((a) => (
-                <div key={a.title} className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200 hover:-translate-y-1 cursor-pointer group">
-                  <div className="h-44 overflow-hidden">
-                    <img src={a.img} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              {ARTICLES.map((a, i) => (
+                <motion.div
+                  key={a.title}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  whileHover={{ y: -6 }}
+                  className="relative rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl overflow-hidden cursor-pointer hover:border-[#FF9900]/40 transition-colors duration-300 group"
+                >
+                  <div className="h-44 overflow-hidden relative">
+                    <img
+                      src={a.img}
+                      alt={a.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-slate-950/40" />
                   </div>
                   <div className="p-4">
-                    <h3 className="font-bold text-sm text-[#111] mb-2 leading-snug">{a.title}</h3>
-                    <p className="text-xs text-gray-600 leading-relaxed mb-3">{a.body}</p>
-                    <span className="text-[#007185] text-xs font-bold hover:underline">Read More →</span>
+                    <h3 className="font-bold text-sm text-white mb-2 leading-snug">{a.title}</h3>
+                    <p className="text-xs text-white/60 leading-relaxed mb-3">{a.body}</p>
+                    <span className="text-[#FF9900] text-xs font-bold group-hover:underline">
+                      Read More →
+                    </span>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </AnimatedSection>
 
           {/* ── BOTTOM BANNER ── */}
-          <div className="relative rounded-lg overflow-hidden h-48"
-            style={{
-              backgroundImage: `url(https://images.unsplash.com/photo-1558694924-78bf8ba63670?w=1200&auto=format&fit=crop&q=60)`,
-              backgroundSize: "cover", backgroundPosition: "center",
-            }}
-          >
-            <div className="absolute inset-0 bg-[#131921]/80" />
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center px-8">
-              <h2 className="text-2xl font-bold mb-2">Together We Can Build A Greener Amazon</h2>
-              <p className="text-gray-300 text-sm max-w-xl">Every return has a second life. Every customer can make a difference.</p>
-              <button
-                onClick={() => navigate("/my-impact")}
-                className="mt-5 bg-[#FF9900] hover:bg-[#E47911] text-[#111] font-bold px-8 py-2 rounded text-sm transition-colors"
-              >
-                See Your Impact →
-              </button>
+          <AnimatedSection>
+            <div className="relative rounded-2xl overflow-hidden border border-emerald-500/20">
+              <img
+                src="https://images.unsplash.com/photo-1558694924-78bf8ba63670?w=1200&auto=format&fit=crop&q=60"
+                alt="Sustainability banner"
+                className="absolute inset-0 w-full h-full object-cover opacity-20"
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/80 via-slate-950/90 to-slate-950/80" />
+              <FloatingBackground variant="grid" />
+              <div className="relative z-10 flex flex-col items-center justify-center text-white text-center px-8 py-14">
+                <span className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-400 mb-4 px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Together We Make an Impact
+                </span>
+                <h2 className="text-2xl xl:text-3xl font-bold mb-3">
+                  Together We Can Build A Greener Amazon
+                </h2>
+                <p className="text-white/60 text-sm max-w-xl mb-6">
+                  Every return has a second life. Every customer can make a difference.
+                </p>
+                <button
+                  onClick={() => navigate("/my-impact")}
+                  className="bg-[#FF9900] hover:bg-[#E47911] text-[#111] font-bold px-8 py-3 rounded-lg text-sm transition-colors"
+                >
+                  See Your Impact →
+                </button>
+              </div>
             </div>
-          </div>
+          </AnimatedSection>
 
         </div>
       </div>

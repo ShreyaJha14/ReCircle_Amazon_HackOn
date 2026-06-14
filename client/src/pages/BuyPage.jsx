@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { GradeBadge, TrustScoreBadge, CarbonSavingIndicator, FloatingBackground } from "../components";
 import { addToCart } from "../redux/cartSlice";
 import { GB_CURRENCY } from "../utils/constants";
-import { publishedListings } from "./SellPage";
+import { getListings, updateListing } from "../utils/CallApi";
 import { useGreenCredits } from "../utils/useGreenCredits";
 import { redeemGreenCredits } from "../utils/CallApi";
 import { updateUser } from "../redux/authSlice";
@@ -116,7 +116,7 @@ const CartDrawer = ({ cartItems, onRemove, onCheckout, onClose }) => {
 };
 
 // ─── Order Modal ────────────────────────────────────────────────────────────
-const OrderModal = ({ item, onClose }) => {
+const OrderModal = ({ item, onClose, onPurchased }) => {
   const dispatch = useDispatch();
   const auth = useSelector((s) => s.auth);
   const user = auth?.user;
@@ -133,7 +133,9 @@ const OrderModal = ({ item, onClose }) => {
   const { awardCredits } = useGreenCredits();
 
   // Recalculate bill whenever toggle changes
-  const discount = useCredits ? Math.min(availableCredits, item.price) : 0;
+  // discount = 10% of available credits (capped at item price)
+  const discountValue = +(availableCredits * 0.1).toFixed(2);
+  const discount = useCredits ? Math.min(discountValue, item.price) : 0;
   const billAfterCredits = Math.max(0, item.price - discount);
 
   const handlePlace = async () => {
@@ -142,14 +144,23 @@ const OrderModal = ({ item, onClose }) => {
     setOrderStage("placing");
 
     setTimeout(async () => {
+      // Mark the listing as sold in the database
+      try {
+        const listingId = item.listingId || item.id;
+        await updateListing(listingId, { status: "sold" });
+        if (onPurchased) onPurchased(listingId);
+      } catch (_) {
+        // If backend unreachable, still complete the flow
+      }
+
       // Deduct credits if used
       if (useCredits && discount > 0 && user && token) {
         try {
-          const data = await redeemGreenCredits(user.id, discount, token);
+          const data = await redeemGreenCredits(user.id, availableCredits, token);
           dispatch(updateUser({ ...user, greenCredits: data.greenCredits }));
         } catch (err) {
           // Fallback: deduct locally
-          dispatch(updateUser({ ...user, greenCredits: Math.max(0, availableCredits - discount) }));
+          dispatch(updateUser({ ...user, greenCredits: 0 }));
         }
       }
 
@@ -234,7 +245,7 @@ const OrderModal = ({ item, onClose }) => {
                   </div>
                   <div className="text-xs text-white/50 mt-0.5">
                     You have <span className="text-emerald-400 font-bold">{availableCredits} credits</span> —
-                    redeem <span className="text-emerald-400 font-bold">{discount} credits</span> to save{" "}
+                    worth <span className="text-emerald-400 font-bold">{GB_CURRENCY.format(discountValue)}</span>, save{" "}
                     <span className="text-emerald-400 font-bold">{GB_CURRENCY.format(discount)}</span> off this order
                   </div>
                 </div>
@@ -428,16 +439,55 @@ const BuyPage = () => {
   const [orderItem, setOrderItem] = useState(null);
   const [addedId, setAddedId] = useState(null);
   const [filter, setFilter] = useState("All");
+  const [loadingListings, setLoadingListings] = useState(true);
+
+  const fetchListings = async () => {
+    try {
+      const data = await getListings({ limit: "50" });
+      const apiListings = (data.listings || []).map((l) => ({
+        id: l.listingId,
+        listingId: l.listingId,
+        title: l.productName,
+        category: l.category,
+        photo: l.photoUrl || null,
+        grade: l.grade,
+        trustScore: l.trustScore,
+        conditionLabel: l.conditionLabel || "Pre-owned",
+        summary: l.description || "",
+        carbonSavedKg: l.carbonSavedKg || 2,
+        price: l.price,
+        publishedAt: l.createdAt,
+        status: l.status,
+      }));
+      setAllListings([...apiListings, ...staticListings]);
+    } catch (_) {
+      // Backend unreachable — show static listings only
+      setAllListings([...staticListings]);
+    } finally {
+      setLoadingListings(false);
+    }
+  };
+
+  const handlePurchased = (listingId) => {
+    setAllListings((prev) =>
+      prev.map((l) =>
+        (l.listingId === listingId || l.id === listingId)
+          ? { ...l, status: "sold" }
+          : l
+      )
+    );
+    setOrderItem(null);
+  };
 
   useEffect(() => {
-    const refresh = () => setAllListings([...publishedListings, ...staticListings]);
-    refresh();
-    const interval = setInterval(refresh, 2000);
+    fetchListings();
+    const interval = setInterval(fetchListings, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const categories = ["All", ...new Set(allListings.map((l) => l.category))];
-  const filtered = filter === "All" ? allListings : allListings.filter((l) => l.category === filter);
+  const filtered = (filter === "All" ? allListings : allListings.filter((l) => l.category === filter))
+    .filter((l) => l.status !== "sold");
 
   const handleAddToCart = (item) => {
     dispatch(addToCart({
@@ -520,7 +570,7 @@ const BuyPage = () => {
         {/* Listings grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filtered.map((item, i) => {
-            const isNew = publishedListings.some((p) => p.id === item.id);
+            const isNew = !!item.listingId; // items from API have listingId; static ones don't
             return (
               <motion.div
                 key={item.id}
@@ -586,7 +636,14 @@ const BuyPage = () => {
           })}
         </div>
 
-        {filtered.length === 0 && (
+        {loadingListings && (
+          <div className="text-center py-20 text-white/40">
+            <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <div>Loading listings…</div>
+          </div>
+        )}
+
+        {!loadingListings && filtered.length === 0 && (
           <div className="text-center py-20 text-white/40">
             <div className="text-4xl mb-3">🛒</div>
             <div>No listings in this category yet.</div>
@@ -616,7 +673,7 @@ const BuyPage = () => {
       {/* Order Modal */}
       <AnimatePresence>
         {orderItem && (
-          <OrderModal item={orderItem} onClose={() => setOrderItem(null)} />
+          <OrderModal item={orderItem} onClose={() => setOrderItem(null)} onPurchased={handlePurchased} />
         )}
       </AnimatePresence>
     </div>

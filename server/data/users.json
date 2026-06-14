@@ -4,7 +4,7 @@
     "name": "shreya jha",
     "email": "shreyaj.ug23.cs@nitp.ac.in",
     "passwordHash": "$2b$10$HJDEsaNnIlgj40IeBo1Wp.nE0kJ9wItf24Pz1CfLmm1X5KAuWZyA.",
-    "greenCredits": 1300,
+    "greenCredits": 100,
     "creditHistory": [
       {
         "type": "earn",
@@ -83,6 +83,66 @@
         "amount": 100,
         "reason": "Sold pre-owned item: nike air max",
         "date": "2026-06-14T14:42:44.450Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-14T20:17:15.551Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-14T21:26:18.336Z"
+      },
+      {
+        "type": "redeem",
+        "amount": 899,
+        "reason": "Redeemed for discount",
+        "date": "2026-06-14T21:30:56.239Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Purchased pre-owned item: Philips Baby Monitor",
+        "date": "2026-06-14T21:30:56.264Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-14T21:33:36.094Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-14T21:51:12.756Z"
+      },
+      {
+        "type": "redeem",
+        "amount": 90,
+        "reason": "Redeemed for discount",
+        "date": "2026-06-14T21:57:16.819Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Purchased pre-owned item: shoes1",
+        "date": "2026-06-14T21:57:16.848Z"
+      },
+      {
+        "type": "redeem",
+        "amount": 911,
+        "reason": "Redeemed for discount",
+        "date": "2026-06-14T21:57:38.339Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-14T22:01:42.647Z"
       }
     ],
     "createdAt": "2026-06-14T13:53:38.362Z"

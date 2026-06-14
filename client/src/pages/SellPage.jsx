@@ -2,12 +2,9 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CameraIcon, CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import { GradeBadge, TrustScoreBadge, CarbonSavingIndicator, FloatingBackground } from "../components";
-import { gradeItem, routeItem } from "../utils/CallApi";
+import { gradeItem, routeItem, createListing } from "../utils/CallApi";
 import { GB_CURRENCY } from "../utils/constants";
 import { useGreenCredits } from "../utils/useGreenCredits";
-
-// Shared in-memory store for published listings (exported so BuyPage can import it)
-export const publishedListings = [];
 
 const STEPS = ["details", "grading", "publish", "done"];
 
@@ -29,7 +26,12 @@ const SellPage = () => {
     const file = e.target.files?.[0];
     if (file) {
       setPhoto(file);
-      setPhotoPreview(URL.createObjectURL(file));
+      // Read as base64 data URL so it can be stored in DB and shown to all users
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setPhotoPreview(ev.target.result);
+      };
+      reader.readAsDataURL(file);
       setErrors((prev) => ({ ...prev, photo: null }));
     }
   };
@@ -89,19 +91,22 @@ const SellPage = () => {
 
   const handlePublish = async () => {
     const listing = {
-      id: Date.now(),
-      title: productName,
+      productName,
       category,
-      photo: photoPreview,
+      photoUrl: photoPreview,
       grade: gradingResult?.grading?.grade || "A",
       trustScore: gradingResult?.grading?.trustScore || 90,
       conditionLabel: gradingResult?.grading?.conditionLabel || "Like New",
-      summary: gradingResult?.grading?.summary || "",
+      description: gradingResult?.grading?.summary || "",
       carbonSavedKg: gradingResult?.grading?.carbonSavedKg || 2,
-      price: parseFloat(price) || 0,
-      publishedAt: new Date().toISOString(),
+      suggestedPrice: parseFloat(price) || 0,
     };
-    publishedListings.unshift(listing);
+
+    try {
+      await createListing(listing);
+    } catch (_) {
+      // If backend is unreachable, silently continue (demo mode)
+    }
 
     // Award +100 credits for listing an item
     const earned = await awardCredits("sell_item", "Listed a pre-owned item on ReCircle");
