@@ -1,18 +1,40 @@
 import { useState } from "react";
 import { Modal } from "./";
 import { CameraIcon } from "@heroicons/react/24/outline";
+import { useGreenCredits } from "../utils/useGreenCredits";
+import CreditToast from "./CreditToast";
 
 const SellReturnModal = ({ onClose, onStartInspection }) => {
   const [productName, setProductName] = useState("");
-  const [category, setCategory] = useState("Shoes");
-  const [photo, setPhoto] = useState(null);
+  const [category, setCategory]       = useState("Shoes");
+  const [photo, setPhoto]             = useState(null);
+  const [toast, setToast]             = useState(null);
+  const { awardCredits, user }        = useGreenCredits();
 
   const handlePhotoChange = (e) => {
     const file = e.target.files?.[0];
     if (file) setPhoto(file);
   };
 
+  const handleSubmit = async () => {
+    // Award credits for selling
+    if (user) {
+      const amount = await awardCredits("sell_item", `Sold pre-owned item: ${productName || category}`);
+      if (amount > 0) {
+        setToast({ amount });
+        setTimeout(() => {
+          setToast(null);
+          onStartInspection?.({ productName, category, photo });
+        }, 2500);
+        return;
+      }
+    }
+    onStartInspection?.({ productName, category, photo });
+  };
+
   return (
+    <>
+      {toast && <CreditToast amount={toast.amount} onDone={() => setToast(null)} />}
     <Modal title="ReCircle — Sell or Return" onClose={onClose} icon="♻️">
       <div className="text-sm xl:text-base text-gray-600 mb-4">
         List your returned or unused item. Our AI handles everything —
@@ -61,12 +83,19 @@ const SellReturnModal = ({ onClose, onStartInspection }) => {
       </label>
 
       <button
-        onClick={() => onStartInspection?.({ productName, category, photo })}
+        onClick={handleSubmit}
         className="btn w-full bg-amazonclone-light_blue text-white hover:bg-opacity-90"
       >
         Start AI Inspection →
       </button>
+
+      {user && (
+        <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2 mt-3 text-center">
+          🌱 You'll earn <strong>+100 Green Credits</strong> for listing this item!
+        </p>
+      )}
     </Modal>
+    </>
   );
 };
 

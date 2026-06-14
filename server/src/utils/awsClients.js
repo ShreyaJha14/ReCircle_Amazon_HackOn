@@ -55,6 +55,6 @@ export const TABLES = {
 export const S3_BUCKET = process.env.S3_BUCKET_NAME || "recircle-item-photos";
 
 export const BEDROCK_MODELS = {
-  CLAUDE_SONNET: process.env.BEDROCK_CLAUDE_MODEL_ID || "anthropic.claude-3-5-sonnet-20241022-v2:0",
-  CLAUDE_HAIKU:  process.env.BEDROCK_CLAUDE_HAIKU_MODEL_ID || "anthropic.claude-3-haiku-20240307-v1:0",
+  CLAUDE_SONNET: process.env.BEDROCK_CLAUDE_MODEL_ID || "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+  CLAUDE_HAIKU:  process.env.BEDROCK_CLAUDE_HAIKU_MODEL_ID || "us.anthropic.claude-3-haiku-20240307-v1:0",
 };

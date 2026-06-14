@@ -1,7 +1,20 @@
+import { useNavigate } from "react-router-dom";
 import { Modal } from "./";
 import { ArchiveBoxIcon, ShoppingBagIcon } from "@heroicons/react/24/outline";
 
 const ReCircleZoneModal = ({ onClose, onSelectSell, onSelectBuy }) => {
+  const navigate = useNavigate();
+
+  const handleSell = () => {
+    onClose();
+    navigate("/recircle/sell");
+  };
+
+  const handleBuy = () => {
+    onClose();
+    navigate("/recircle/buy");
+  };
+
   return (
     <Modal title="ReCircle Zone" onClose={onClose} icon="♻️">
       <div className="text-sm xl:text-base text-gray-600 mb-4 text-center">
@@ -10,7 +23,7 @@ const ReCircleZoneModal = ({ onClose, onSelectSell, onSelectBuy }) => {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <button
-          onClick={onSelectSell}
+          onClick={handleSell}
           className="border rounded-lg p-6 flex flex-col items-center text-center hover:shadow-lg hover:border-amazonclone-light_blue transition"
         >
           <ArchiveBoxIcon className="h-10 w-10 mb-2 text-amazonclone-light_blue" />
@@ -23,7 +36,7 @@ const ReCircleZoneModal = ({ onClose, onSelectSell, onSelectBuy }) => {
           </div>
         </button>
         <button
-          onClick={onSelectBuy}
+          onClick={handleBuy}
           className="border rounded-lg p-6 flex flex-col items-center text-center hover:shadow-lg hover:border-orange-400 transition"
         >
           <ShoppingBagIcon className="h-10 w-10 mb-2 text-orange-400" />

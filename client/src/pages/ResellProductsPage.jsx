@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   PageHero,
@@ -9,6 +10,8 @@ import {
   FloatingBackground,
 } from "../components";
 import { GB_CURRENCY } from "../utils/constants";
+import { useGreenCredits } from "../utils/useGreenCredits";
+import CreditToast from "../components/CreditToast";
 
 
 const listings = [
@@ -105,7 +108,24 @@ const listings = [
 ];
 
 const ResellProductsPage = () => {
+  const { awardCredits, user } = useGreenCredits();
+  const [toast, setToast] = useState(null); // { amount }
+
+  const handleBuyClick = async () => {
+    if (!user) return;
+    const amount = await awardCredits("buy_resell", "Bought from ReCircle P2P resell marketplace");
+    if (amount > 0) setToast({ amount });
+  };
+
+  const handleSellClick = async () => {
+    if (!user) return;
+    const amount = await awardCredits("sell_item", "Listed a pre-owned item for resell on ReCircle");
+    if (amount > 0) setToast({ amount });
+  };
+
   return (
+    <>
+      {toast && <CreditToast amount={toast.amount} onDone={() => setToast(null)} />}
     <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 min-h-screen relative">
       <div className="min-w-[1000px] max-w-[1500px] m-auto p-6 relative">
         <FloatingBackground variant="grid" />
@@ -158,8 +178,8 @@ const ResellProductsPage = () => {
                           {GB_CURRENCY.format(item.oldPrice)}
                         </div>
                       </div>
-                      <Link to={`/product/${item.id}`}>
-                        <GlowButton variant="primary">View Product</GlowButton>
+                      <Link to={`/product/${item.id}`} onClick={handleBuyClick}>
+                        <GlowButton variant="primary">Buy Pre-owned</GlowButton>
                       </Link>
                     </div>
                   </GlassCard>
@@ -248,6 +268,7 @@ const ResellProductsPage = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

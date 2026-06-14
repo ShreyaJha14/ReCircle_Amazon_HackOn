@@ -16,6 +16,8 @@ import {
   SustainabilityPage,
   ReturnedProductsPage,
   ResellProductsPage,
+  SellPage,
+  BuyPage,
 } from "./pages";
 import MyImpactPage from "./pages/MyImpactPage";
 
@@ -29,6 +31,8 @@ const App = () => {
           <Route path="/recircle" element={<ReCirclePage />} />
           <Route path="/recircle/returns-today" element={<ReturnedProductsPage />} />
           <Route path="/recircle/resale" element={<ResellProductsPage />} />
+          <Route path="/recircle/sell" element={<SellPage />} />
+          <Route path="/recircle/buy" element={<BuyPage />} />
           <Route path="/ai-grading" element={<AIGradingPage />} />
           <Route path="/routing" element={<RoutingPage />} />
           <Route path="/passport" element={<PassportPage />} />

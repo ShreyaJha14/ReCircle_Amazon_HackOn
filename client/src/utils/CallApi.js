@@ -43,8 +43,12 @@ export const listRecentItems = (limit = 20) =>
   axios.get(`${BASE_URL}/grading/items`, { ...config, params: { limit } }).then((r) => r.data);
 
 // ── Smart Routing ─────────────────────────────────────────────────────────────
+// ── Smart Routing ─────────────────────────────────────────────────────────────
 export const routeItem = (payload) =>
   axios.post(`${BASE_URL}/routing/decide`, payload, config).then((r) => r.data);
+
+export const getRoutingDecision = (decisionId) =>
+  axios.get(`${BASE_URL}/routing/decisions/${decisionId}`, config).then((r) => r.data);
 
 export const getRoutingMetrics = () =>
   axios.get(`${BASE_URL}/routing/metrics`, config).then((r) => r.data);
@@ -74,6 +78,31 @@ export const getPreventionMetrics = () =>
 // ── Sustainability ────────────────────────────────────────────────────────────
 export const getSustainabilityDashboard = () =>
   axios.get(`${BASE_URL}/sustainability/dashboard`, config).then((r) => r.data);
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+export const signup = (payload) =>
+  axios.post(`${BASE_URL}/auth/signup`, payload, config).then((r) => r.data);
+
+export const login = (payload) =>
+  axios.post(`${BASE_URL}/auth/login`, payload, config).then((r) => r.data);
+
+export const getMe = (token) =>
+  axios.get(`${BASE_URL}/auth/me`, {
+    ...config,
+    headers: { ...config.headers, Authorization: `Bearer ${token}` },
+  }).then((r) => r.data);
+
+export const addGreenCredits = (userId, amount, reason, token) =>
+  axios.post(`${BASE_URL}/auth/credits/add`, { userId, amount, reason }, {
+    ...config,
+    headers: { ...config.headers, Authorization: `Bearer ${token}` },
+  }).then((r) => r.data);
+
+export const redeemGreenCredits = (userId, amount, token) =>
+  axios.post(`${BASE_URL}/auth/credits/redeem`, { userId, amount }, {
+    ...config,
+    headers: { ...config.headers, Authorization: `Bearer ${token}` },
+  }).then((r) => r.data);
 
 // ── Marketplace Listings ──────────────────────────────────────────────────────
 export const getListings = (params = {}) =>

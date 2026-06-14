@@ -6,3 +6,5 @@ export { default as PreventionPage } from "./PreventionPage";
 export { default as SustainabilityPage } from "./SustainabilityPage";
 export { default as ReturnedProductsPage } from "./ReturnedProductsPage";
 export { default as ResellProductsPage } from "./ResellProductsPage";
+export { default as SellPage } from "./SellPage";
+export { default as BuyPage } from "./BuyPage";

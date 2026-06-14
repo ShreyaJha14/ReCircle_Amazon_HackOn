@@ -1,0 +1,90 @@
+[
+  {
+    "id": "user-1781445218362",
+    "name": "shreya jha",
+    "email": "shreyaj.ug23.cs@nitp.ac.in",
+    "passwordHash": "$2b$10$HJDEsaNnIlgj40IeBo1Wp.nE0kJ9wItf24Pz1CfLmm1X5KAuWZyA.",
+    "greenCredits": 1300,
+    "creditHistory": [
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: nike air max",
+        "date": "2026-06-14T14:06:28.879Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: Shoes",
+        "date": "2026-06-14T14:10:45.712Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: Shoes",
+        "date": "2026-06-14T14:10:47.379Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: Shoes",
+        "date": "2026-06-14T14:12:01.169Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: Shoes",
+        "date": "2026-06-14T14:12:03.512Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: Shoes",
+        "date": "2026-06-14T14:13:22.542Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: Shoes",
+        "date": "2026-06-14T14:13:24.842Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: Shoes",
+        "date": "2026-06-14T14:33:02.331Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: Shoes",
+        "date": "2026-06-14T14:33:04.887Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: Shoes",
+        "date": "2026-06-14T14:33:31.618Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: nike air max",
+        "date": "2026-06-14T14:35:04.420Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: nike air max",
+        "date": "2026-06-14T14:35:06.304Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Sold pre-owned item: nike air max",
+        "date": "2026-06-14T14:42:44.450Z"
+      }
+    ],
+    "createdAt": "2026-06-14T13:53:38.362Z"
+  }
+]

@@ -13,6 +13,7 @@ import * as prevention from "./handlers/prevention.js";
 import * as sustainability from "./handlers/sustainability.js";
 import * as listings from "./handlers/listings.js";
 import * as products from "./handlers/products.js";
+import * as auth from "./handlers/auth.js";
 
 const router = Router();
 
@@ -33,6 +34,13 @@ const aiLimiter = rateLimit({
 router.get("/health", (req, res) =>
   res.json({ status: "ok", service: "ReCircle API", timestamp: new Date().toISOString() })
 );
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+router.post("/auth/signup",         auth.signup);
+router.post("/auth/login",          auth.login);
+router.get("/auth/me",              auth.getMe);
+router.post("/auth/credits/add",    auth.addCredits);
+router.post("/auth/credits/redeem", auth.redeemCredits);
 
 // ── Products (Amazon catalogue) ───────────────────────────────────────────────
 router.get("/products", products.getProducts);

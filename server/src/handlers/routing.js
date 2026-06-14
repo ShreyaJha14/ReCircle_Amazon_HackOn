@@ -1,67 +1,117 @@
 // src/handlers/routing.js
 // Feature 2 — Smart Routing (Decision Engine)
-// Determines the best next destination for a returned item based on:
-// condition score + item category + value + local demand.
-// Powered by a Lambda-style rules engine backed by a lightweight Bedrock AI explanation.
+// Now backed by /services/routingEngine.js for clean, testable business logic.
 
 import { v4 as uuidv4 } from "uuid";
 import { PutCommand, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamo, TABLES } from "../utils/awsClients.js";
-import { invokeClaudeText, extractJSON } from "../utils/bedrockHelper.js";
-
-// Routing outcomes (mirrors the front-end labels)
-const ROUTES = {
-  RESELL_AS_IS: "resell_as_is",
-  REFURBISH:    "refurbish",
-  P2P_EXCHANGE: "p2p_exchange",
-  DONATE:       "donate",
-  RECYCLE:      "recycle",
-};
+import { invokeClaudeText } from "../utils/bedrockHelper.js";
+import {
+  calculateRoute,
+  calculateRecoveryValue,
+  calculateConfidence,
+} from "../services/routingEngine.js";
 
 // ── Main routing decision endpoint ────────────────────────────────────────────
 export async function routeItem(req, res) {
   try {
-    const { itemId, grade, trustScore, category, estimatedValue, localDemandScore } = req.body;
+    const {
+      itemId,
+      // New engine inputs (preferred)
+      conditionScore,
+      category,
+      originalPrice,
+      estimatedRepairCost,
+      demandLevel,
+      returnReason,
+      // Legacy inputs (kept for backwards compat)
+      grade,
+      trustScore,
+      estimatedValue,
+      localDemandScore,
+    } = req.body;
 
-    if (!grade) {
-      return res.status(400).json({ error: "grade is required (A/B/C/D)" });
-    }
+    // Map legacy fields if new fields not provided
+    const resolvedScore =
+      conditionScore !== undefined
+        ? Number(conditionScore)
+        : trustScore !== undefined
+        ? Number(trustScore)
+        : gradeToScore(grade);
+
+    const resolvedPrice =
+      originalPrice !== undefined ? Number(originalPrice) : Number(estimatedValue) || 30;
+
+    const resolvedDemand =
+      demandLevel !== undefined
+        ? demandLevel
+        : localDemandScore >= 70
+        ? "high"
+        : localDemandScore >= 40
+        ? "medium"
+        : "low";
 
     // 1️⃣  Rules engine (deterministic, fast)
-    const rules = applyRoutingRules({ grade, trustScore, category, estimatedValue, localDemandScore });
+    const engineResult = calculateRoute({
+      conditionScore:    resolvedScore,
+      category:          category || "General",
+      originalPrice:     resolvedPrice,
+      estimatedRepairCost: Number(estimatedRepairCost) || 0,
+      demandLevel:       resolvedDemand,
+      returnReason:      returnReason || "",
+    });
 
-    // 2️⃣  Bedrock AI explanation (Claude Haiku — cheap, fast)
-    let aiExplanation = rules.defaultExplanation;
+    // 2️⃣  Bedrock AI reasoning (optional enrichment)
+    let aiReasoning = null;
     try {
-      const prompt = buildExplanationPrompt({ grade, category, rules });
-      aiExplanation = await invokeClaudeText(prompt, {
-        maxTokens: 200,
+      const prompt = `A ${category || "product"} was returned in ${engineResult.routeLabel} condition (score: ${resolvedScore}/100).
+The routing engine selected: "${engineResult.routeLabel}" (confidence: ${engineResult.confidence}%, expected recovery: $${engineResult.expectedRecoveryValue}).
+Key factors: ${engineResult.reasons.join(", ")}.
+Give a 2-sentence plain-English explanation for the seller, explaining why this route maximises value and what happens next.`;
+
+      aiReasoning = await invokeClaudeText(prompt, {
+        maxTokens: 150,
         systemPrompt:
-          "You are a routing specialist for ReCircle, Amazon's circular commerce platform. Give a concise 2-sentence explanation of why an item was routed a certain way.",
+          "You are a routing specialist for ReCircle, Amazon's circular commerce platform. Give concise, helpful explanations.",
       });
+      aiReasoning = aiReasoning?.trim() || null;
     } catch (err) {
-      console.warn("Bedrock explanation unavailable:", err.message);
+      console.warn("Bedrock reasoning unavailable:", err.message);
     }
 
-    // 3️⃣  Persist routing decision
+    // 3️⃣  Persist to DynamoDB — RoutingHistory schema
     const decisionId = uuidv4();
-    const decision = {
+    const now = new Date().toISOString();
+
+    const historyRecord = {
+      // RoutingHistory schema fields (as spec'd)
+      itemId:     itemId || "unlinked",
+      route:      engineResult.route,
+      timestamp:  now,
+      confidence: engineResult.confidence,
+      reasons:    engineResult.reasons,
+      // Additional enrichment
       decisionId,
-      itemId: itemId || "unlinked",
-      route: rules.route,
-      routeLabel: rules.routeLabel,
-      confidence: rules.confidence,
-      reasoning: aiExplanation.trim(),
-      carbonImpact: rules.carbonImpact,
-      estimatedRecoveryPct: rules.estimatedRecoveryPct,
-      createdAt: new Date().toISOString(),
-      metadata: { grade, trustScore, category, estimatedValue, localDemandScore },
+      routeLabel:            engineResult.routeLabel,
+      routeEmoji:            engineResult.routeEmoji,
+      routeColor:            engineResult.routeColor,
+      expectedRecoveryValue: engineResult.expectedRecoveryValue,
+      aiReasoning:           aiReasoning || engineResult.reasons.join(". "),
+      inputs: {
+        conditionScore: resolvedScore,
+        category:       category || "General",
+        originalPrice:  resolvedPrice,
+        estimatedRepairCost: Number(estimatedRepairCost) || 0,
+        demandLevel:    resolvedDemand,
+        returnReason:   returnReason || "",
+      },
+      createdAt: now,
     };
 
-    await dynamo.send(new PutCommand({ TableName: TABLES.ROUTING, Item: decision }));
+    await dynamo.send(new PutCommand({ TableName: TABLES.ROUTING, Item: historyRecord }));
 
     // 4️⃣  Update item status if itemId provided
-    if (itemId) {
+    if (itemId && itemId !== "unlinked") {
       try {
         await dynamo.send(
           new UpdateCommand({
@@ -72,7 +122,7 @@ export async function routeItem(req, res) {
             ExpressionAttributeValues: {
               ":s": "routed",
               ":d": decisionId,
-              ":t": new Date().toISOString(),
+              ":t": now,
             },
           })
         );
@@ -84,13 +134,22 @@ export async function routeItem(req, res) {
     return res.status(201).json({
       success: true,
       decisionId,
-      route: rules.route,
-      routeLabel: rules.routeLabel,
-      confidence: rules.confidence,
-      reasoning: aiExplanation.trim(),
-      carbonImpact: rules.carbonImpact,
-      estimatedRecoveryPct: rules.estimatedRecoveryPct,
-      nextSteps: rules.nextSteps,
+      // Core routing result
+      route:                 engineResult.route,
+      routeLabel:            engineResult.routeLabel,
+      routeEmoji:            engineResult.routeEmoji,
+      routeColor:            engineResult.routeColor,
+      confidence:            engineResult.confidence,
+      reasons:               engineResult.reasons,
+      expectedRecoveryValue: engineResult.expectedRecoveryValue,
+      aiReasoning:           aiReasoning || null,
+      // All recovery values (for UI display)
+      recoveryValues: calculateRecoveryValue({
+        conditionScore:     resolvedScore,
+        originalPrice:      resolvedPrice,
+        estimatedRepairCost: Number(estimatedRepairCost) || 0,
+        demandLevel:        resolvedDemand,
+      }),
     });
   } catch (err) {
     console.error("routeItem error:", err);
@@ -116,8 +175,6 @@ export async function getRoutingDecision(req, res) {
 // ── Get routing analytics / metrics ──────────────────────────────────────────
 export async function getRoutingMetrics(req, res) {
   try {
-    // In production this would query a DynamoDB aggregation or CloudWatch Metrics.
-    // For the hackathon we return a mix of real aggregate + realistic computed values.
     const result = await dynamo.send(
       new GetCommand({
         TableName: TABLES.SUSTAINABILITY,
@@ -149,58 +206,7 @@ export async function getRoutingMetrics(req, res) {
   }
 }
 
-// ── Rules engine ──────────────────────────────────────────────────────────────
-function applyRoutingRules({ grade, trustScore = 80, category, estimatedValue = 30, localDemandScore = 60 }) {
-  const score = trustScore ?? gradeToScore(grade);
-
-  // High-value electronics with good condition → always try to resell
-  if (score >= 85 && category === "Electronics" && estimatedValue > 50) {
-    return buildResult(ROUTES.RESELL_AS_IS, "AI Verified → ReCircle Zone", 97, 85, 4.2,
-      ["List on ReCircle marketplace", "Apply AI-Verified badge", "Auto-price at 35% discount"]);
-  }
-
-  if (score >= 80 && localDemandScore >= 70) {
-    return buildResult(ROUTES.P2P_EXCHANGE, "P2P Match → Nearby Buyer", 93, 80, 3.8,
-      ["Match to nearby buyer via geosearch", "Send push notification via SNS", "Complete P2P transfer"]);
-  }
-
-  if (score >= 65) {
-    return buildResult(ROUTES.RESELL_AS_IS, "AI Verified → Resale", 90, 70, 3.5,
-      ["List on ReCircle marketplace", "Apply condition badge", "Auto-price at 45% discount"]);
-  }
-
-  if (score >= 45) {
-    return buildResult(ROUTES.REFURBISH, "Refurbished → Resale", 82, 55, 2.8,
-      ["Send to refurbishment partner", "Re-grade after repair", "Relist with refurb badge"]);
-  }
-
-  if (score >= 25) {
-    return buildResult(ROUTES.DONATE, "Donation → ReCircle Zone", 75, 20, 2.1,
-      ["Partner charity allocation", "Tax credit generated for original owner", "Track donation impact"]);
-  }
-
-  return buildResult(ROUTES.RECYCLE, "Responsible Recycling", 88, 5, 1.5,
-    ["Certified e-waste recycler allocation", "Material recovery tracked", "Green credit issued"]);
-}
-
-function buildResult(route, routeLabel, confidence, estimatedRecoveryPct, carbonImpact, nextSteps) {
-  return {
-    route,
-    routeLabel,
-    confidence,
-    estimatedRecoveryPct,
-    carbonImpact,
-    nextSteps,
-    defaultExplanation: `Based on item condition and local demand, ${routeLabel} was selected as the optimal outcome, recovering ${estimatedRecoveryPct}% of item value.`,
-  };
-}
-
+// ── Helper ────────────────────────────────────────────────────────────────────
 function gradeToScore(grade) {
   return { A: 92, B: 78, C: 55, D: 30 }[grade] ?? 60;
-}
-
-function buildExplanationPrompt({ grade, category, rules }) {
-  return `A ${category || "product"} was returned with grade ${grade}. 
-The routing engine selected: "${rules.routeLabel}" (confidence: ${rules.confidence}%, estimated value recovery: ${rules.estimatedRecoveryPct}%).
-Give a 2-sentence plain-English explanation for the seller/buyer, explaining why this route was chosen and what happens next.`;
 }
