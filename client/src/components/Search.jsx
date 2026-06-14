@@ -2,7 +2,7 @@ import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { useState, useEffect } from "react";
 import { useNavigate, createSearchParams } from "react-router-dom";
 
-import { callAPI } from "../utils/CallApi";
+import { getListings } from "../utils/CallApi";
 
 const Search = () => {
   const [suggestions, setSuggestions] = useState(null);
@@ -25,11 +25,20 @@ const Search = () => {
     setCategory("All");
   };
 
-  const getSuggestions = () => {
-    callAPI(`data/suggestions.json`).then((suggestionResults) => {
-      setSuggestions(suggestionResults);
-    });
-  };
+const getSuggestions = async () => {
+  try {
+    const response = await getListings();
+
+    setSuggestions(
+      response.listings.map((item, index) => ({
+        id: index,
+        title: item.productName,
+      }))
+    );
+  } catch (error) {
+    console.error("Failed to load suggestions:", error);
+  }
+};
 
   useEffect(() => {
     getSuggestions();
