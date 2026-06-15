@@ -6,6 +6,12 @@
 import { v4 as uuidv4 } from "uuid";
 import { invokeClaudeVision, extractJSON } from "../utils/bedrockHelper.js";
 
+function createAICertifiedId() {
+  const year = new Date().getFullYear();
+  const suffix = String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
+  return `RC-AI-${year}-${suffix}`;
+}
+
 // ── Grade a returned item via photo upload ────────────────────────────────────
 export async function gradeItem(req, res) {
   try {
@@ -70,10 +76,12 @@ IMPORTANT: Base your assessment ONLY on what you can actually see in the uploade
     }
 
     const carbonSaved = gradingResult.carbonSavedKg || estimateCarbonSaved(category);
+    const aiCertifiedId = createAICertifiedId();
 
     return res.status(201).json({
       success: true,
       itemId,
+      aiCertifiedId,
       usedFallback: !!gradingResult._fallback,
       grading: {
         grade:                      gradingResult.grade,
