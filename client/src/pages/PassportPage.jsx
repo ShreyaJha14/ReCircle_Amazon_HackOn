@@ -1,3 +1,5 @@
+
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   PageHeader,
@@ -8,6 +10,7 @@ import {
   FloatingBackground,
   PageHero,
 } from "../components";
+import { useState, useEffect } from "react";
 
 const journeySteps = [
   { icon: "🏭", label: "Manufacturing" },
@@ -25,6 +28,50 @@ const badges = [
 ];
 
 const PassportPage = () => {
+  const navigate = useNavigate();
+  const [imagePreview, setImagePreview] = useState(null);
+  const [repairDone, setRepairDone] = useState("No");
+  const [repairDetails, setRepairDetails] = useState("");
+  const [suggestedHistory, setSuggestedHistory] = useState([]);
+
+  useEffect(() => {
+    const recs = [
+      { event: "Purchased new", ownedAt: new Date().toISOString() },
+      { event: "ReCircle inspection", ownedAt: new Date().toISOString() },
+      { event: "Refurbished - battery replaced", ownedAt: new Date().toISOString() },
+    ];
+    setSuggestedHistory(recs);
+  }, []);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setImagePreview(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const addHistoryEntry = (entry) => {
+    // keep suggestions lean: remove added entry
+    setSuggestedHistory((s) => s.filter((x) => x.event !== entry.event));
+    // save draft to localStorage so create page can pick it up
+    const draft = JSON.parse(localStorage.getItem("passportDraft") || "{}");
+    const ownershipHistory = Array.isArray(draft.ownershipHistory) ? [...draft.ownershipHistory] : [];
+    ownershipHistory.push({ event: entry.event, ownedAt: entry.ownedAt || new Date().toISOString() });
+    localStorage.setItem("passportDraft", JSON.stringify({ ...draft, ownershipHistory }));
+  };
+
+  const applyLocalUpdates = () => {
+    const draft = JSON.parse(localStorage.getItem("passportDraft") || "{}");
+    const next = { ...draft };
+    if (imagePreview) next.image = imagePreview;
+    if (repairDone === "Yes") {
+      next.repairHistory = next.repairHistory ? [...next.repairHistory, repairDetails || "Repair reported"] : [repairDetails || "Repair reported"];
+    }
+    localStorage.setItem("passportDraft", JSON.stringify(next));
+    navigate("/passport/create");
+  };
+
   return (
     <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 min-h-screen relative">
       <div className="min-w-[1000px] max-w-[1500px] m-auto p-6 relative">
@@ -169,12 +216,17 @@ const PassportPage = () => {
           </AnimatedSection>
 
           {/* Footer note */}
-          <AnimatedSection className="mt-10">
-            <GlassCard className="p-6 text-sm xl:text-base text-white/60">
-              Look for the &quot;View Product Passport (ReCircle)&quot; link on eligible
-              product pages to see this information for a specific item.
-            </GlassCard>
-          </AnimatedSection>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <GlassCard className="p-6 flex-1 text-sm xl:text-base text-white/60">
+                Create a passport for your returned item, then preview the generated ReCircle passport card.
+              </GlassCard>
+              <button
+                onClick={() => navigate("/passport/create")}
+                className="inline-flex items-center justify-center rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-600 transition"
+              >
+                Create Passport for ReCircle
+              </button>
+          </div>
         </div>
       </div>
     </div>
