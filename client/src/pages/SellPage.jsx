@@ -12,6 +12,7 @@ const SellPage = () => {
   const [step, setStep] = useState("details");
   const [productName, setProductName] = useState("");
   const [category, setCategory] = useState("");
+  const [size, setSize] = useState("");
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoBase64, setPhotoBase64] = useState(null);
@@ -51,6 +52,11 @@ const SellPage = () => {
     const newErrors = {};
     if (!productName.trim()) newErrors.productName = "Product name is required.";
     if (!category) newErrors.category = "Please select a category.";
+    if (
+      ["Clothing", "Shoes"].includes(category) && !size
+    ) {
+      newErrors.size = "Please select a size.";
+    }
     if (!photo) newErrors.photo = "Please upload a product photo.";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -66,6 +72,7 @@ const SellPage = () => {
       if (photo) formData.append("photo", photo);
       formData.append("productName", productName);
       formData.append("category", category);
+      formData.append("size", size);
 
       const gradingRes = await gradeItem(formData);
 
@@ -112,6 +119,7 @@ const SellPage = () => {
       await createListing({
         productName,
         category,
+        size,
         grade: gradingResult?.grading?.grade || "A",
         trustScore: gradingResult?.grading?.trustScore || 90,
         photoUrl: photoBase64 || null,
@@ -145,6 +153,7 @@ const SellPage = () => {
     setStep("details");
     setProductName("");
     setCategory("");
+    setSize("");
     setPhoto(null);
     setPhotoPreview(null);
     setGradingResult(null);
@@ -272,6 +281,44 @@ const SellPage = () => {
                   </div>
                 )}
                 {!errors.category && <div className="mb-4" />}
+                {["Clothing", "Shoes"].includes(category) && (
+                  <>
+                  <label className="block text-sm font-semibold mb-1 text-white/80">
+                  Size <span className="text-red-400">*</span>
+                  </label>
+                  <select 
+                  value={size}
+                  onChange={(e)=> {
+                    setSize(e.target.value);
+                    if(e.target.value) {
+                      setErrors((prev) => ({ ...prev, size: null }));
+                    }
+                  }}
+                  className={`w-full p-3 rounded-lg bg-white/10 border text-white mb-1 focus:outline-none focus:border-[#FF9900] transition ${
+                    errors.size ? "border-red-400" : "border-white/20"}${!size ? "text-white/40" : ""}`}
+                  >
+                    <option value="" disabled className="text-black">
+                      Select a size...
+                    </option>
+                    <option value="XS" className="text-black">XS</option>
+                    <option value="S" className="text-black">S</option>
+                    <option value="M" className="text-black">M</option>
+                    <option value="L" className="text-black">L</option>
+                    <option value="XL" className="text-black">XL</option>
+                    <option value="XXL" className="text-black">XXL</option>
+                    <option value="One Size" className="text-black">
+                      One Size
+                    </option>
+                  </select>
+                  {errors.size && (
+                    <div className="flex items-center gap-1 text-red-400 text-xs mb-4">
+                      <ExclamationCircleIcon className="h-3.5 w-3.5" />
+                      {errors.size}
+                    </div>
+                  )}
+                   {!errors.size && <div className="mb-4" />}
+                  </>
+                )}
 
                 {/* Photo */}
                 <label className="block text-sm font-semibold mb-1 text-white/80">
@@ -401,7 +448,10 @@ const SellPage = () => {
                   )}
                   <div>
                     <div className="font-bold text-base mb-1">{productName}</div>
-                    <div className="text-sm text-white/50 mb-2">{category}</div>
+                    <div className="text-sm text-white/50 mb-2">
+                    {category}
+                    {size && ` • Size: ${size}`}
+                    </div>
                     <div className="flex gap-2">
                       <GradeBadge grade={grading?.grade || "A"} />
                       <TrustScoreBadge score={grading?.trustScore || 90} />
@@ -451,9 +501,23 @@ const SellPage = () => {
                 </motion.div>
                 <div className="text-2xl font-bold mb-2">Your item is now live!</div>
                 <div className="text-white/60 text-base mb-2">
-                  <span className="text-white font-semibold">{productName}</span> has been published at{" "}
-                  <span className="text-[#FF9900] font-bold">{GB_CURRENCY.format(parseFloat(price))}</span>
+                  <span className="text-white font-semibold">{productName}</span>
+                  {size && (
+                    <div className="text-emerald-400 text-sm font-medium mt-1">
+                      Size: {size}
+                    </div>
+                  )}
+                  <div className="mt-2">
+                    Published at{" "}
+                    <span className="text-[#FF9900] font-bold">
+                      {GB_CURRENCY.format(parseFloat(price))}
+                    </span>
+                  </div>
                 </div>
+                  {/* <span className="text-white font-semibold">{productName}</span> has been published at{" "}
+
+                  <span className="text-[#FF9900] font-bold">{GB_CURRENCY.format(parseFloat(price))}</span>
+                </div> */}
                 <div className="text-white/40 text-sm mb-5">It's now visible to buyers on the ReCircle Buy page.</div>
 
                 {/* Credits awarded */}
