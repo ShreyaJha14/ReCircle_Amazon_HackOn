@@ -4,7 +4,7 @@
     "name": "shreya jha",
     "email": "shreyaj.ug23.cs@nitp.ac.in",
     "passwordHash": "$2b$10$HJDEsaNnIlgj40IeBo1Wp.nE0kJ9wItf24Pz1CfLmm1X5KAuWZyA.",
-    "greenCredits": 500,
+    "greenCredits": 470,
     "creditHistory": [
       {
         "type": "earn",
@@ -185,6 +185,54 @@
         "amount": 100,
         "reason": "Donated a product via ReCircle",
         "date": "2026-06-15T08:59:41.086Z"
+      },
+      {
+        "type": "redeem",
+        "amount": 500,
+        "reason": "Redeemed for discount",
+        "date": "2026-06-15T09:44:55.654Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Purchased pre-owned item: Prestige Induction Cooktop",
+        "date": "2026-06-15T09:44:55.673Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Purchased pre-owned item: Prestige Induction Cooktop",
+        "date": "2026-06-15T09:45:15.408Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Purchased pre-owned item: Prestige Induction Cooktop",
+        "date": "2026-06-15T09:46:07.250Z"
+      },
+      {
+        "type": "redeem",
+        "amount": 130,
+        "reason": "Redeemed for discount",
+        "date": "2026-06-15T09:49:11.393Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Purchased pre-owned item: Nike Air Max 270",
+        "date": "2026-06-15T09:49:11.413Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Donated a product via AI Grading page",
+        "date": "2026-06-15T10:01:28.636Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Donated , via ReCircle to undefined",
+        "date": "2026-06-15T10:05:49.665Z"
       }
     ],
     "createdAt": "2026-06-14T13:53:38.362Z",
@@ -224,6 +272,78 @@
         "photoUrl": null,
         "price": null,
         "date": "2026-06-15T08:59:41.086Z"
+      },
+      {
+        "id": "act-1781516695673",
+        "activityType": "buy_resell",
+        "reason": "Purchased pre-owned item: Prestige Induction Cooktop",
+        "credits": 100,
+        "productName": "Prestige Induction Cooktop",
+        "category": "Home & Kitchen",
+        "size": null,
+        "photoUrl": null,
+        "price": 1599,
+        "date": "2026-06-15T09:44:55.673Z"
+      },
+      {
+        "id": "act-1781516715408",
+        "activityType": "buy_resell",
+        "reason": "Purchased pre-owned item: Prestige Induction Cooktop",
+        "credits": 100,
+        "productName": "Prestige Induction Cooktop",
+        "category": "Home & Kitchen",
+        "size": null,
+        "photoUrl": null,
+        "price": 1599,
+        "date": "2026-06-15T09:45:15.408Z"
+      },
+      {
+        "id": "act-1781516767250",
+        "activityType": "buy_resell",
+        "reason": "Purchased pre-owned item: Prestige Induction Cooktop",
+        "credits": 100,
+        "productName": "Prestige Induction Cooktop",
+        "category": "Home & Kitchen",
+        "size": null,
+        "photoUrl": null,
+        "price": 1599,
+        "date": "2026-06-15T09:46:07.250Z"
+      },
+      {
+        "id": "act-1781516951413",
+        "activityType": "buy_resell",
+        "reason": "Purchased pre-owned item: Nike Air Max 270",
+        "credits": 100,
+        "productName": "Nike Air Max 270",
+        "category": "Shoes",
+        "size": null,
+        "photoUrl": null,
+        "price": 12.99,
+        "date": "2026-06-15T09:49:11.413Z"
+      },
+      {
+        "id": "act-1781517688637",
+        "activityType": "donate",
+        "reason": "Donated a product via AI Grading page",
+        "credits": 100,
+        "productName": ".",
+        "category": "Clothing",
+        "size": null,
+        "photoUrl": "blob:http://localhost:5173/ac151bc3-d640-43ea-aa48-501b7dc6c7aa",
+        "price": null,
+        "date": "2026-06-15T10:01:28.637Z"
+      },
+      {
+        "id": "act-1781517949665",
+        "activityType": "donate",
+        "reason": "Donated , via ReCircle to undefined",
+        "credits": 100,
+        "productName": null,
+        "category": null,
+        "size": null,
+        "photoUrl": null,
+        "price": null,
+        "date": "2026-06-15T10:05:49.665Z"
       }
     ]
   },
