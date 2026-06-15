@@ -12,6 +12,8 @@ import {
   AIGradingPage,
   RoutingPage,
   PassportPage,
+  PassportCreatePage,
+  PassportPreviewPage,
   PreventionPage,
   SustainabilityPage,
   ResellProductsPage,
@@ -35,6 +37,8 @@ const App = () => {
           <Route path="/ai-grading" element={<AIGradingPage />} />
           <Route path="/routing" element={<RoutingPage />} />
           <Route path="/passport" element={<PassportPage />} />
+          <Route path="/passport/create" element={<PassportCreatePage />} />
+          <Route path="/passport/preview/:passportId" element={<PassportPreviewPage />} />
           <Route path="/prevention" element={<PreventionPage />} />
           <Route path="/sustainability" element={<SustainabilityPage />} />
           <Route path="/my-impact" element={<MyImpactPage />} />
