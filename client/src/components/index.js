@@ -52,4 +52,5 @@ export { default as ReCircleNavBar } from "./ReCircleNavBar";
 export { default as ReCircleLayout } from "./ReCircleLayout";
 export { default as AuthModal } from "./AuthModal";
 export { default as CreditToast } from "./CreditToast";
-export { default as RoutingDecisionCard } from "./RoutingDecisionCard";
+export { default as CartHealthDashboard } from "./CartHealthDashboard";
+export { default as ImpactInsightsPanel } from "./ImpactInsightsPanel";

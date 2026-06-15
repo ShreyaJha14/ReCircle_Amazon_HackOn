@@ -1,111 +1,120 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { updateUser } from "../redux/authSlice";
-import { getMe, redeemGreenCredits } from "../utils/CallApi";
-import { motion } from "framer-motion";
-import {
-  AnimatedSection,
-  GlassCard,
-  StatCard,
-  FloatingBackground,
-  PageHero,
-  FeatureCard,
-} from "../components";
+import { HeartIcon } from "@heroicons/react/24/outline";
+import { updateUser, logout } from "../redux/authSlice";
+import { getMe, redeemGreenCredits, getUserHistory } from "../utils/CallApi";
 
-const OUTCOME_BARS = [
-  { label: "Resold (P2P)",   count: "3 items", pct: 60, accent: "emerald-500" },
-  { label: "Amazon Renewed", count: "2 items", pct: 40, accent: "teal-500"    },
-  { label: "Donated",        count: "1 item",  pct: 20, accent: "orange-400"  },
-  { label: "Recycled",       count: "1 item",  pct: 20, accent: "slate-400"   },
-];
+/* ── helpers ── */
+const CO2_PER_SELL   = 6.8;   // kg CO₂ saved per item listed/sold
+const CO2_PER_BUY    = 4.2;   // kg CO₂ saved per pre-owned purchase
+const CO2_PER_DONATE = 3.5;   // kg CO₂ saved per donation
+const WATER_PER_ITEM = 34;    // litres water saved per item
 
-const MILESTONES = [
-  { icon: "🌱", label: "First Resell",   sub: "Earned!",      done: true  },
-  { icon: "♻️", label: "Zero Waste Week", sub: "Earned!",      done: true  },
-  { icon: "📦", label: "10 Items Saved",  sub: "3 more to go", done: false },
-  { icon: "🏆", label: "50kg CO₂ Hero",   sub: "31.6kg to go", done: false },
-];
+function computeStats(history) {
+  const sells   = history.filter((a) => a.activityType === "sell_item");
+  const buys    = history.filter((a) => a.activityType === "buy_resell");
+  const donates = history.filter((a) => a.activityType === "donate");
+
+  const totalItems = sells.length + buys.length + donates.length;
+  const co2 = +(sells.length * CO2_PER_SELL + buys.length * CO2_PER_BUY + donates.length * CO2_PER_DONATE).toFixed(1);
+  const water = totalItems * WATER_PER_ITEM;
+  const earned = history.reduce((s, a) => s + (a.price || 0), 0);
+
+  return { sells, buys, donates, totalItems, co2, water, earned };
+}
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+const ACTIVITY_META = {
+  sell_item:  { icon: "🛒", label: "Sold",     color: "bg-emerald-100 text-emerald-800",  credits: "+100" },
+  buy_resell: { icon: "📦", label: "Purchased", color: "bg-blue-100 text-blue-800",        credits: "+100" },
+  donate:     { icon: "💚", label: "Donated",   color: "bg-orange-100 text-orange-800",    credits: "+100" },
+  recycle:    { icon: "♻️", label: "Recycled",  color: "bg-gray-100 text-gray-700",        credits: "+40"  },
+  redeem:     { icon: "🎁", label: "Redeemed",  color: "bg-purple-100 text-purple-800",    credits: ""     },
+};
 
 /* ── Redeem Modal ── */
 const RedeemModal = ({ credits, discountINR, onClose }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center">
-    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-    <motion.div
-      initial={{ opacity: 0, scale: 0.92, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-      className="relative rounded-2xl border border-white/10 bg-slate-900/90 backdrop-blur-xl shadow-[0_30px_80px_rgba(0,0,0,0.5)] w-full max-w-md mx-4 overflow-hidden"
-    >
-      <div className="bg-gradient-to-br from-emerald-900/80 to-slate-900/80 border-b border-white/10 px-8 pt-8 pb-6 text-center text-white">
+    <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+    <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="bg-green-700 px-8 pt-8 pb-6 text-center text-white">
         <div className="text-5xl mb-3">🎉</div>
         <h2 className="text-2xl font-bold mb-1">Credits Redeemed!</h2>
-        <p className="text-emerald-300 text-sm">Congratulations on going green</p>
+        <p className="text-green-100 text-sm">Congratulations on going green</p>
       </div>
       <div className="px-8 py-6 text-center">
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-5">
-          <p className="text-sm text-white/80 leading-relaxed">
-            <strong className="text-white">{credits} Green Credits</strong> have been applied to your account.
-            You will receive a <strong className="text-emerald-400">₹{discountINR} discount</strong> on your{" "}
-            <strong className="text-white">next Amazon purchase</strong> — automatically deducted at checkout.
+        <div className="bg-[#E3F3FF] border border-[#a8d4ef] rounded-lg p-4 mb-5">
+          <p className="text-sm text-gray-700 leading-relaxed">
+            <strong>{credits} Green Credits</strong> applied.
+            You receive a <strong>₹{discountINR} discount</strong> on your{" "}
+            <strong>next Amazon purchase</strong> — auto-deducted at checkout.
           </p>
         </div>
-        <div className="flex items-center gap-3 justify-center mb-5 text-sm text-white/60">
-          <span className="flex items-center gap-1"><span className="text-emerald-400 font-bold text-base">✓</span>Discount saved</span>
-          <span className="text-white/20">|</span>
-          <span className="flex items-center gap-1"><span className="text-emerald-400 font-bold text-base">✓</span>Valid 90 days</span>
-          <span className="text-white/20">|</span>
-          <span className="flex items-center gap-1"><span className="text-emerald-400 font-bold text-base">✓</span>Auto-applied</span>
+        <div className="flex items-center gap-3 justify-center mb-5 text-sm text-gray-600">
+          <span className="flex items-center gap-1"><span className="text-green-600 font-bold">✓</span>Discount saved</span>
+          <span className="text-gray-300">|</span>
+          <span className="flex items-center gap-1"><span className="text-green-600 font-bold">✓</span>Valid 90 days</span>
+          <span className="text-gray-300">|</span>
+          <span className="flex items-center gap-1"><span className="text-green-600 font-bold">✓</span>Auto-applied</span>
         </div>
-        <button
-          onClick={onClose}
-          className="w-full bg-[#FF9900] hover:bg-[#E47911] text-[#111] font-bold py-3 rounded-lg transition-colors text-sm"
-        >
+        <button onClick={onClose} className="w-full bg-[#FF9900] hover:bg-[#E47911] text-[#111] font-bold py-3 rounded transition-colors text-sm">
           Continue Shopping
         </button>
-        <p className="text-xs text-white/30 mt-3">Credits applied · Check your account wallet for details</p>
       </div>
-    </motion.div>
+    </div>
   </div>
 );
 
-/* ── Login Prompt ── */
 const LoginPrompt = ({ onLogin }) => (
-  <GlassCard className="p-10 text-center max-w-md mx-auto mt-16" hover={false}>
+  <div className="bg-white border border-gray-200 rounded-lg p-10 text-center max-w-md mx-auto mt-16">
     <div className="text-5xl mb-4">🔒</div>
-    <h2 className="text-xl font-bold text-white mb-2">Sign in to view your impact</h2>
-    <p className="text-sm text-white/60 mb-6">
-      Track your Green Credits, CO₂ savings, and sustainability milestones.
-    </p>
-    <button
-      onClick={onLogin}
-      className="bg-[#FF9900] hover:bg-[#E47911] text-[#111] font-bold px-8 py-3 rounded-lg text-sm transition-colors"
-    >
+    <h2 className="text-xl font-bold text-[#111] mb-2">Sign in to view your impact</h2>
+    <p className="text-sm text-gray-600 mb-6">Track your Green Credits, CO₂ savings, and full activity history.</p>
+    <button onClick={onLogin} className="bg-[#FF9900] hover:bg-[#E47911] text-[#111] font-bold px-8 py-3 rounded text-sm transition-colors">
       Sign in / Create account
     </button>
-  </GlassCard>
+  </div>
 );
 
-const MyImpactPage = ({ onShowAuth }) => {
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const auth     = useSelector((s) => s.auth);
-  const user     = auth?.user;
-  const token    = auth?.token;
+const MyImpactPage = () => {
+  const navigate  = useNavigate();
+  const dispatch  = useDispatch();
+  const auth      = useSelector((s) => s.auth);
+  const user      = auth?.user;
+  const token     = auth?.token;
 
-  const [credits,     setCredits]     = useState(user?.greenCredits ?? 0);
-  const [showRedeem,  setShowRedeem]  = useState(false);
-  const [discountINR, setDiscountINR] = useState(0);
-  const [loading,     setLoading]     = useState(false);
+  const [credits,        setCredits]        = useState(user?.greenCredits ?? 0);
+  const [showRedeem,     setShowRedeem]     = useState(false);
+  const [discountINR,    setDiscountINR]    = useState(0);
+  const [loading,        setLoading]        = useState(false);
+  const [activityHistory, setActivityHistory] = useState([]);
+  const [historyLoading,  setHistoryLoading]  = useState(false);
+  const [activeTab,      setActiveTab]      = useState("all");
 
+  // Refresh user + history
   useEffect(() => {
-    if (!token) return;
+    if (!token || !user) return;
+    // Refresh credits
     getMe(token)
-      .then((d) => {
-        dispatch(updateUser(d.user));
-        setCredits(d.user.greenCredits ?? 0);
-      })
+      .then((d) => { dispatch(updateUser(d.user)); setCredits(d.user.greenCredits ?? 0); })
       .catch(() => {});
+    // Fetch activity history
+    setHistoryLoading(true);
+    getUserHistory(user.id, token)
+      .then((d) => setActivityHistory(d.activityHistory || []))
+      .catch(() => setActivityHistory([]))
+      .finally(() => setHistoryLoading(false));
   }, [token]);
 
   const handleRedeem = async () => {
@@ -124,244 +133,307 @@ const MyImpactPage = ({ onShowAuth }) => {
     }
   };
 
+  /* ── Derived real stats ── */
+  const { sells, buys, donates, totalItems, co2, water, earned } = computeStats(activityHistory);
+
   const statCards = [
-    { value: 18.4, decimals: 1, suffix: " kg",  label: "CO₂ prevented this year",     icon: "🌿", accent: "emerald-400" },
-    { value: 7,    decimals: 0, suffix: "",      label: "Items diverted from landfill", icon: "♻️", accent: "teal-400"   },
-    { value: 240,  decimals: 0, suffix: " L",    label: "Water saved",                  icon: "💧", accent: "blue-400"   },
-    { value: 6400, decimals: 0, prefix: "₹",     label: "Earned from returns",          icon: "💰", accent: "orange-400" },
+    { value: `${co2} kg`,       label: "CO₂ prevented",             icon: "🌿", color: "text-green-700"  },
+    { value: `${totalItems}`,   label: "Items diverted from landfill", icon: "♻️", color: "text-green-700"  },
+    { value: `${water} L`,      label: "Water saved",                icon: "💧", color: "text-[#007185]" },
+    { value: `₹${earned.toLocaleString("en-IN")}`, label: "Value from ReCircle activity", icon: "💰", color: "text-[#B12704]" },
   ];
 
+  // Outcome bars derived from real data
+  const maxItems = Math.max(sells.length, buys.length, donates.length, 1);
+  const outcomeBars = [
+    { label: "Sold (P2P)",        count: `${sells.length} item${sells.length !== 1 ? "s" : ""}`,   pct: Math.round((sells.length / maxItems) * 100),   color: "bg-green-600"   },
+    { label: "Purchased Pre-owned", count: `${buys.length} item${buys.length !== 1 ? "s" : ""}`,    pct: Math.round((buys.length / maxItems) * 100),    color: "bg-[#007185]"   },
+    { label: "Donated",           count: `${donates.length} item${donates.length !== 1 ? "s" : ""}`, pct: Math.round((donates.length / maxItems) * 100), color: "bg-[#E47911]"   },
+  ];
+
+  // Milestones derived from real data
+  const milestones = [
+    { icon: "🌱", label: "First Action",   sub: totalItems >= 1 ? "Earned!" : "Complete 1 action",  done: totalItems >= 1  },
+    { icon: "♻️", label: "5 Items Saved",  sub: totalItems >= 5 ? "Earned!" : `${5 - totalItems} more to go`,  done: totalItems >= 5  },
+    { icon: "📦", label: "10 Items Saved", sub: totalItems >= 10 ? "Earned!" : `${10 - totalItems} more to go`, done: totalItems >= 10 },
+    { icon: "🏆", label: "50 kg CO₂ Hero", sub: co2 >= 50 ? "Earned!" : `${(50 - co2).toFixed(1)} kg to go`,  done: co2 >= 50        },
+  ];
+
+  // Filtered history for the tab
+  const filteredHistory = activityHistory
+    .slice()
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .filter((a) => activeTab === "all" || a.activityType === activeTab);
+
   return (
-    <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 min-h-screen relative">
+    <div className="bg-[#f3f3f3] font-sans min-h-screen">
       {showRedeem && (
-        <RedeemModal
-          credits={credits === 0 ? (user?.greenCredits ?? 0) : credits}
-          discountINR={discountINR}
-          onClose={() => setShowRedeem(false)}
-        />
+        <RedeemModal credits={credits === 0 ? (user?.greenCredits ?? 0) : credits} discountINR={discountINR} onClose={() => setShowRedeem(false)} />
       )}
 
-      <div className="min-w-[1000px] max-w-[1500px] mx-auto p-6 relative">
-        <FloatingBackground variant="grid" />
-
-        <div className="relative z-10">
-
-          {/* ── HERO ── */}
-          <PageHero
-            eyebrow="My ReCircle Dashboard"
-            title="Your Sustainability Impact"
-            subtitle="Every ReCircle action keeps products out of landfill and reduces your carbon footprint. Here's what you've achieved."
-            actions={
-              <Link
-                to="/sustainability"
-                className="border border-white/20 hover:border-emerald-400/50 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors bg-white/5 hover:bg-white/10"
-              >
-                ← Back to Sustainability Hub
-              </Link>
-            }
-            visual={
-              user ? (
-                <GlassCard className="p-6 flex flex-col items-center justify-center text-center gap-2" hover={false}>
-                  <div className="text-4xl mb-1">🌱</div>
-                  <div className="text-5xl font-black text-emerald-400">{credits}</div>
-                  <div className="text-sm font-bold text-white">Green Credits</div>
-                  <div className="text-xs text-white/40">≈ ₹{Math.floor(credits * 0.1)} discount</div>
-                  <button
-                    onClick={handleRedeem}
-                    disabled={credits === 0 || loading}
-                    className={`mt-3 w-full py-2.5 rounded-lg text-sm font-bold transition-colors ${
-                      credits === 0
-                        ? "bg-white/10 cursor-not-allowed text-white/30"
-                        : "bg-[#FF9900] hover:bg-[#E47911] text-[#111]"
-                    }`}
-                  >
-                    {loading ? "Processing…" : credits === 0 ? "Redeemed ✓" : `Redeem ₹${Math.floor(credits * 0.1)} Discount`}
-                  </button>
-                </GlassCard>
-              ) : null
-            }
+      <div className="min-w-[1000px] max-w-[1500px] mx-auto">
+        {/* ── HERO ── */}
+        <div className="relative h-[260px] overflow-hidden">
+          <img
+            src="https://images.unsplash.com/photo-1497436072909-60f360e1d4b1?w=1200&auto=format&fit=crop&q=70"
+            alt="My Impact"
+            className="w-full h-full object-cover object-center"
           />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#131921]/90 via-[#131921]/60 to-transparent" />
+          <div className="absolute inset-0 flex items-center px-16 justify-between">
+            <div className="text-white">
+              <span className="inline-block bg-green-700 text-white text-xs font-bold px-3 py-1 rounded-full tracking-widest uppercase mb-4">
+                My ReCircle Dashboard
+              </span>
+              <h1 className="text-4xl font-bold leading-tight mb-2">Your Sustainability Impact</h1>
+              <p className="text-gray-300 text-sm">Every ReCircle action keeps products out of landfill and reduces your carbon footprint.</p>
+            </div>
+            {user && (
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-8 py-5 text-center text-white">
+                <div className="text-4xl font-black text-green-400">{credits}</div>
+                <div className="text-sm font-bold mt-1">Green Credits</div>
+                <div className="text-xs text-gray-300 mt-0.5">≈ ₹{Math.floor(credits * 0.1)} discount</div>
+              </div>
+            )}
+          </div>
+        </div>
 
+        {/* ── BREADCRUMB ── */}
+        <div className="bg-[#232F3E] px-8 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-xs">Account</span>
+            <span className="text-gray-600 mx-1">›</span>
+            <span className="text-[#FF9900] text-xs font-bold">My Sustainability Impact</span>
+          </div>
+          <Link to="/sustainability" className="text-[#FF9900] text-xs font-bold hover:underline">
+            ← Back to Sustainability Hub
+          </Link>
+        </div>
+
+        <div className="p-6 space-y-6">
           {!user ? (
             <LoginPrompt onLogin={() => navigate("/")} />
           ) : (
             <>
               {/* ── STAT CARDS ── */}
-              <AnimatedSection className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-                {statCards.map((s, i) => (
-                  <StatCard
-                    key={s.label}
-                    value={s.value}
-                    decimals={s.decimals}
-                    prefix={s.prefix || ""}
-                    suffix={s.suffix}
-                    label={s.label}
-                    icon={s.icon}
-                    accent={s.accent}
-                    delay={i * 0.08}
-                  />
+              <div className="grid grid-cols-4 gap-4">
+                {statCards.map((s) => (
+                  <div key={s.label} className="bg-white border border-gray-200 rounded-lg p-5 text-center hover:shadow-md transition-all duration-200 hover:-translate-y-1">
+                    <div className="text-3xl mb-2">{s.icon}</div>
+                    <div className={`text-3xl font-black ${s.color}`}>{s.value}</div>
+                    <div className="text-xs text-gray-500 mt-2 leading-snug">{s.label}</div>
+                  </div>
                 ))}
-              </AnimatedSection>
+              </div>
 
               {/* ── OUTCOME BARS + GREEN CREDITS ── */}
-              <AnimatedSection className="grid grid-cols-3 gap-4 mb-10">
-                {/* Outcome bars */}
-                <GlassCard className="col-span-2 p-6" hover={false}>
-                  <h2 className="text-base font-bold text-white mb-5 pb-2 border-b border-white/10">Items by Outcome</h2>
-                  <div className="space-y-5">
-                    {OUTCOME_BARS.map((bar, i) => (
-                      <div key={bar.label}>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="text-white/70">{bar.label}</span>
-                          <span className="font-bold text-white">{bar.count}</span>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2 bg-white border border-gray-200 rounded-lg p-6">
+                  <h2 className="text-base font-bold text-[#111] mb-5 pb-2 border-b border-gray-100">Items by Outcome</h2>
+                  {totalItems === 0 ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <div className="text-4xl mb-3">📭</div>
+                      <p className="text-sm">No activity yet. Start by selling, buying, or donating!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {outcomeBars.map((bar) => (
+                        <div key={bar.label}>
+                          <div className="flex justify-between text-sm mb-2">
+                            <span className="text-gray-700">{bar.label}</span>
+                            <span className="font-bold text-gray-800">{bar.count}</span>
+                          </div>
+                          <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                            <div className={`${bar.color} h-2.5 rounded-full transition-all duration-700`} style={{ width: `${bar.pct}%` }} />
+                          </div>
                         </div>
-                        <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            whileInView={{ width: `${bar.pct}%` }}
-                            viewport={{ once: true }}
-                            transition={{ duration: 0.8, delay: i * 0.1, ease: "easeOut" }}
-                            className={`bg-${bar.accent} h-2 rounded-full`}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </GlassCard>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-                {/* Green Credits card */}
-                <GlassCard className="p-6 flex flex-col items-center justify-center text-center gap-2" glowColor="emerald-400">
-                  <div className="text-4xl mb-1">🌱</div>
-                  <div className="text-5xl font-black text-emerald-400">{credits}</div>
-                  <p className="text-sm font-bold text-white">
-                    {credits > 0 ? "Green Credits" : "Credits Redeemed"}
-                  </p>
-                  <p className="text-xs text-white/40">1 credit = ₹0.10 discount</p>
-                  {credits > 0 && (
-                    <p className="text-xs text-emerald-400 font-semibold">
-                      ≈ ₹{Math.floor(credits * 0.1)} off next purchase
-                    </p>
-                  )}
-                  {credits === 0 && (
-                    <p className="text-xs text-white/30">Sell or buy resell items to earn credits</p>
-                  )}
+                {/* ── GREEN CREDITS CARD ── */}
+                <div className="bg-[#131921] rounded-lg p-6 flex flex-col items-center justify-center text-center text-white border border-gray-700">
+                  <div className="text-5xl mb-2">🌱</div>
+                  <div className="text-5xl font-black text-green-400 mb-1">{credits}</div>
+                  <p className="text-base font-bold text-white mb-1">{credits > 0 ? "Green Credits" : "Credits Redeemed"}</p>
+                  <p className="text-xs text-gray-400 mb-1 leading-relaxed">1 credit = ₹0.10 discount</p>
+                  {credits > 0 && <p className="text-xs text-green-400 font-semibold mb-4">≈ ₹{Math.floor(credits * 0.1)} off next purchase</p>}
+                  {credits === 0 && <p className="text-xs text-gray-500 mb-4">Sell, buy, or donate items to earn credits</p>}
                   <button
                     onClick={handleRedeem}
                     disabled={credits === 0 || loading}
-                    className={`mt-2 w-full py-3 rounded-lg text-sm font-bold transition-colors ${
-                      credits === 0
-                        ? "bg-white/10 cursor-not-allowed text-white/30"
-                        : "bg-[#FF9900] hover:bg-[#E47911] text-[#111]"
-                    }`}
+                    className={`w-full py-3 rounded text-sm font-bold ${credits === 0 ? "bg-gray-600 cursor-not-allowed text-gray-400" : "bg-[#FF9900] hover:bg-[#E47911] text-[#111]"}`}
                   >
                     {loading ? "Processing…" : credits === 0 ? "Redeemed ✓" : `Redeem ₹${Math.floor(credits * 0.1)} Discount`}
                   </button>
-                  <p className="text-xs text-white/30 mt-1">Earn credits by reselling & buying pre-owned</p>
-                </GlassCard>
-              </AnimatedSection>
+                  <p className="text-xs text-gray-500 mt-3">Earn credits by reselling, buying & donating</p>
+                </div>
+              </div>
+
+              {/* ── ACTIVITY HISTORY ── */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+                  <h2 className="text-base font-bold text-[#111]">📋 Activity History</h2>
+                  <div className="flex gap-1">
+                    {[
+                      { key: "all",       label: "All" },
+                      { key: "sell_item", label: "Sold" },
+                      { key: "buy_resell",label: "Purchased" },
+                      { key: "donate",    label: "Donated" },
+                    ].map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                          activeTab === tab.key
+                            ? "bg-[#131921] text-white"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {historyLoading ? (
+                  <div className="text-center py-10">
+                    <div className="inline-block w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin mb-2" />
+                    <p className="text-sm text-gray-500">Loading history…</p>
+                  </div>
+                ) : filteredHistory.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400">
+                    <div className="text-4xl mb-3">📭</div>
+                    <p className="text-sm">No {activeTab === "all" ? "" : activeTab.replace("_", " ")} activity yet.</p>
+                    <div className="flex gap-2 justify-center mt-4">
+                      <Link to="/recircle/sell" className="text-xs bg-[#FF9900] text-[#111] font-bold px-4 py-2 rounded hover:bg-[#E47911] transition">Sell an Item</Link>
+                      <Link to="/recircle/buy" className="text-xs bg-green-600 text-white font-bold px-4 py-2 rounded hover:bg-green-700 transition">Buy Pre-owned</Link>
+                      <Link to="/donate" className="text-xs bg-gray-800 text-white font-bold px-4 py-2 rounded hover:bg-gray-700 transition">Donate</Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {filteredHistory.map((activity) => {
+                      const meta = ACTIVITY_META[activity.activityType] || ACTIVITY_META["sell_item"];
+                      return (
+                        <div key={activity.id} className="flex items-center gap-4 py-3 hover:bg-gray-50 rounded-lg px-2 transition-colors">
+                          <div className="text-2xl w-8 text-center flex-shrink-0">{meta.icon}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${meta.color}`}>{meta.label}</span>
+                              {activity.category && (
+                                <span className="text-[10px] text-gray-400 font-medium">{activity.category}</span>
+                              )}
+                              {activity.size && (
+                                <span className="text-[10px] text-gray-400">· Size {activity.size}</span>
+                              )}
+                            </div>
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {activity.productName || activity.reason}
+                            </p>
+                            {activity.price > 0 && (
+                              <p className="text-xs text-gray-500">₹{activity.price.toLocaleString("en-IN")}</p>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-green-700 font-black text-sm">+{activity.credits} credits</div>
+                            <div className="text-xs text-gray-400">{timeAgo(activity.date)}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               {/* ── HOW TO EARN ── */}
-              <AnimatedSection className="mb-10">
-                <h2 className="text-xl xl:text-2xl font-bold text-white mb-6">💡 How to Earn Green Credits</h2>
-                <div className="grid grid-cols-3 gap-1">
-                  <FeatureCard
-                    icon="🛒"
-                    title="Sell a pre-owned item"
-                    description="List an item on ReCircle P2P Resell and earn 100 Green Credits when it sells."
-                    linkText="+100 credits"
-                    delay={0}
-                  />
-                  <FeatureCard
-                    icon="📦"
-                    title="Buy from ReCircle Resell"
-                    description="Choose a pre-owned product over new and earn 50 Green Credits on every qualifying purchase."
-                    linkText="+50 credits"
-                    delay={0.05}
-                  />
-                  <FeatureCard
-                    icon="♻️"
-                    title="Return & donate an item"
-                    description="Donate a returned item through ReCircle instead of discarding it and earn 75 Green Credits."
-                    linkText="+75 credits"
-                    delay={0.1}
-                  />
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <h2 className="text-base font-bold text-[#111] mb-4 pb-2 border-b border-gray-100">💡 How to Earn Green Credits</h2>
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { icon: "🛒", label: "Sell a pre-owned item",   credits: "+100 credits", link: "/recircle/sell" },
+                    { icon: "📦", label: "Buy from ReCircle Resell", credits: "+100 credits", link: "/recircle/buy"  },
+                    { icon: "💚", label: "Donate an item",           credits: "+100 credits", link: "/donate"        },
+                  ].map((item) => (
+                    <Link to={item.link} key={item.label} className="flex items-center gap-4 bg-green-50 rounded-lg p-4 border border-green-100 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200">
+                      <span className="text-3xl">{item.icon}</span>
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">{item.label}</p>
+                        <p className="text-green-700 font-black text-sm">{item.credits}</p>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
-              </AnimatedSection>
+              </div>
 
               {/* ── MILESTONES ── */}
-              <AnimatedSection className="mb-10">
-                <h2 className="text-xl xl:text-2xl font-bold text-white mb-6">🏅 Sustainability Milestones</h2>
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <h2 className="text-base font-bold text-[#111] mb-4 pb-2 border-b border-gray-100">🏅 Sustainability Milestones</h2>
                 <div className="grid grid-cols-4 gap-4">
-                  {MILESTONES.map((m, i) => (
-                    <motion.div
+                  {milestones.map((m) => (
+                    <div
                       key={m.label}
-                      initial={{ opacity: 0, y: 24 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, margin: "-40px" }}
-                      transition={{ duration: 0.5, delay: i * 0.08 }}
-                      whileHover={{ y: -4 }}
-                      className={`relative rounded-2xl border p-5 text-center transition-colors duration-300 ${
-                        m.done
-                          ? "bg-emerald-500/10 border-emerald-500/30 hover:border-emerald-400/60"
-                          : "bg-white/5 border-white/10 opacity-50 hover:opacity-70"
+                      className={`rounded-lg p-5 text-center border transition-all duration-200 hover:shadow-sm hover:-translate-y-1 ${
+                        m.done ? "bg-[#e8f5ee] border-green-200" : "bg-gray-50 border-gray-200 opacity-60"
                       }`}
                     >
                       <div className="text-2xl mb-2">{m.icon}</div>
-                      <h3 className="font-bold text-sm text-white mb-1">{m.label}</h3>
-                      <p className={`text-xs ${m.done ? "text-emerald-400 font-semibold" : "text-white/40"}`}>
-                        {m.sub}
-                      </p>
-                      {m.done && (
-                        <span className="absolute top-3 right-3 text-[10px] font-bold text-emerald-400 bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.5 rounded-full">
-                          ✓
-                        </span>
-                      )}
-                    </motion.div>
+                      <h3 className="font-bold text-sm text-[#111] mb-1">{m.label}</h3>
+                      <p className={`text-xs ${m.done ? "text-green-700 font-semibold" : "text-gray-500"}`}>{m.sub}</p>
+                    </div>
                   ))}
                 </div>
-              </AnimatedSection>
+              </div>
+
+              {/* ── DONATE CARD ── */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6 flex items-center justify-between gap-6">
+                <div className="flex items-center gap-5">
+                  <div className="bg-green-100 rounded-full p-4">
+                    <HeartIcon className="h-8 w-8 text-green-700" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-[#111] mb-1">Donate a Product</h2>
+                    <p className="text-sm text-gray-500">
+                      Give unused items a second life. Earn <strong className="text-green-700">+100 Green Credits</strong> per donation.
+                    </p>
+                  </div>
+                </div>
+                <Link to="/donate" className="flex-shrink-0 bg-[#FF9900] hover:bg-[#E47911] text-[#111] font-bold px-8 py-3 rounded text-sm transition-colors whitespace-nowrap">
+                  💚 Donate Now →
+                </Link>
+              </div>
 
               {/* ── BOTTOM BANNER ── */}
-              <AnimatedSection>
-                <div className="relative rounded-2xl overflow-hidden border border-emerald-500/20">
-                  <img
-                    src="https://images.unsplash.com/photo-1497436072909-60f360e1d4b1?w=1200&auto=format&fit=crop&q=60"
-                    alt="Go green"
-                    className="absolute inset-0 w-full h-full object-cover opacity-15"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-950/80 via-slate-950/90 to-slate-950/80" />
-                  <FloatingBackground variant="grid" />
-                  <div className="relative z-10 grid grid-cols-2 items-center">
-                    <div className="p-10 text-white">
-                      <span className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-400 mb-4 px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Amazon ReCircle
-                      </span>
-                      <h2 className="text-3xl font-bold text-white mb-3">Go Green with Amazon</h2>
-                      <p className="text-white/50 text-sm leading-relaxed mb-6">
-                        Every product you resell, refurbish, donate, or recycle contributes to a cleaner and more sustainable future.
-                      </p>
-                      <button
-                        onClick={handleRedeem}
-                        disabled={credits === 0}
-                        className="bg-[#FF9900] hover:bg-[#E47911] disabled:bg-white/10 disabled:cursor-not-allowed disabled:text-white/30 text-[#111] font-bold px-6 py-2.5 rounded-lg text-sm transition-colors"
-                      >
-                        {credits > 0 ? `Redeem My ${credits} Credits →` : "No credits to redeem"}
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-center p-8">
-                      <div className="text-center text-white">
-                        <div className="text-8xl font-black text-emerald-400 leading-none">{credits}</div>
-                        <div className="text-xl font-bold mt-2">Green Credits</div>
-                        <div className="text-xs text-white/40 mt-1">
-                          {credits > 0 ? `≈ ₹${Math.floor(credits * 0.1)} discount` : "Earn by recycling & reselling"}
-                        </div>
+              <div className="bg-[#131921] rounded-lg overflow-hidden border border-gray-700">
+                <div className="grid grid-cols-2 items-center">
+                  <div className="p-10 text-white">
+                    <span className="inline-block bg-green-700 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide mb-4">
+                      Amazon ReCircle
+                    </span>
+                    <h2 className="text-3xl font-bold mb-3">Go Green with Amazon</h2>
+                    <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                      Every product you resell, refurbish, donate, or recycle contributes to a cleaner and more sustainable future.
+                    </p>
+                    <button
+                      onClick={handleRedeem}
+                      disabled={credits === 0}
+                      className="bg-[#FF9900] hover:bg-[#E47911] disabled:bg-gray-600 disabled:cursor-not-allowed text-[#111] font-bold px-6 py-2.5 rounded text-sm transition-colors"
+                    >
+                      {credits > 0 ? `Redeem My ${credits} Credits →` : "No credits to redeem"}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-center p-8">
+                    <div className="text-center text-white">
+                      <div className="text-8xl font-black text-green-400 leading-none">{credits}</div>
+                      <div className="text-xl font-bold mt-2">Green Credits</div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {credits > 0 ? `≈ ₹${Math.floor(credits * 0.1)} discount` : "Earn by recycling & reselling"}
                       </div>
                     </div>
                   </div>
                 </div>
-              </AnimatedSection>
-
+              </div>
             </>
           )}
         </div>

@@ -139,6 +139,22 @@ export function addCredits(req, res) {
       date:   new Date().toISOString(),
     });
 
+    // Build structured activity entry from reason string
+    user.activityHistory = user.activityHistory || [];
+    const meta = req.body.meta || {};
+    user.activityHistory.push({
+      id:          `act-${Date.now()}`,
+      activityType: req.body.activityType || "other",
+      reason:      reason || "ReCircle activity",
+      credits,
+      productName: meta.productName || null,
+      category:    meta.category    || null,
+      size:        meta.size        || null,
+      photoUrl:    meta.photoUrl    || null,
+      price:       meta.price       || null,
+      date:        new Date().toISOString(),
+    });
+
     writeDB(users);
     return res.json({ success: true, greenCredits: user.greenCredits, user: safeUser(user) });
   } catch (err) {
@@ -177,5 +193,31 @@ export function redeemCredits(req, res) {
   } catch (err) {
     console.error("redeemCredits error:", err);
     return res.status(500).json({ error: "Failed to redeem credits" });
+  }
+}
+
+// ── GET /api/auth/history/:userId  (Bearer token required) ───────────────────
+export function getUserHistory(req, res) {
+  try {
+    const header = req.headers.authorization || "";
+    const token  = header.replace("Bearer ", "").trim();
+    if (!token) return res.status(401).json({ error: "No token provided" });
+
+    const jwt     = require("jsonwebtoken");
+    const payload = jwt.verify(token, JWT_SECRET);
+    const users   = readDB();
+    const user    = users.find((u) => u.id === req.params.userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (user.id !== payload.id)
+      return res.status(403).json({ error: "Forbidden" });
+
+    return res.json({
+      success: true,
+      activityHistory: user.activityHistory || [],
+      creditHistory:   user.creditHistory   || [],
+      greenCredits:    user.greenCredits    || 0,
+    });
+  } catch {
+    return res.status(401).json({ error: "Invalid or expired token" });
   }
 }

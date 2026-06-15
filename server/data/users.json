@@ -4,7 +4,7 @@
     "name": "shreya jha",
     "email": "shreyaj.ug23.cs@nitp.ac.in",
     "passwordHash": "$2b$10$HJDEsaNnIlgj40IeBo1Wp.nE0kJ9wItf24Pz1CfLmm1X5KAuWZyA.",
-    "greenCredits": 100,
+    "greenCredits": 400,
     "creditHistory": [
       {
         "type": "earn",
@@ -143,8 +143,130 @@
         "amount": 100,
         "reason": "Listed a pre-owned item on ReCircle",
         "date": "2026-06-14T22:01:42.647Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-15T03:28:01.459Z"
+      },
+      {
+        "type": "redeem",
+        "amount": 200,
+        "reason": "Redeemed for discount",
+        "date": "2026-06-15T03:28:51.654Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Purchased pre-owned item: mat",
+        "date": "2026-06-15T03:28:51.682Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-15T03:31:59.688Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-15T07:39:44.155Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-15T07:45:04.812Z"
       }
     ],
-    "createdAt": "2026-06-14T13:53:38.362Z"
+    "createdAt": "2026-06-14T13:53:38.362Z",
+    "activityHistory": [
+      {
+        "id": "act-1781509184155",
+        "activityType": "sell_item",
+        "reason": "Listed a pre-owned item on ReCircle",
+        "credits": 100,
+        "productName": "shoes",
+        "category": "Shoes",
+        "size": null,
+        "photoUrl": "blob:http://localhost:5173/da7973ee-d541-4ffe-aa89-30061e8f45c7",
+        "price": 1300,
+        "date": "2026-06-15T07:39:44.155Z"
+      },
+      {
+        "id": "act-1781509504812",
+        "activityType": "sell_item",
+        "reason": "Listed a pre-owned item on ReCircle",
+        "credits": 100,
+        "productName": "e",
+        "category": "Shoes",
+        "size": null,
+        "photoUrl": "blob:http://localhost:5173/2befb7c0-ffa0-46be-b5d4-355ac365a8c9",
+        "price": 199,
+        "date": "2026-06-15T07:45:04.812Z"
+      }
+    ]
+  },
+  {
+    "id": "user-1781494392334",
+    "name": "varsha jha",
+    "email": "meeh.shreya.jha@gmail.com",
+    "passwordHash": "$2b$10$L0OBBhbite20sgq9Hf4S/.ZszoOec2A2C0x0SBOrOq.EFK7mzozFG",
+    "greenCredits": 575,
+    "creditHistory": [
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-15T04:44:52.906Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-15T04:46:17.972Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-15T04:48:59.287Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Purchased pre-owned item: nn",
+        "date": "2026-06-15T04:49:25.793Z"
+      },
+      {
+        "type": "earn",
+        "amount": 75,
+        "reason": "Donated a product via ReCircle",
+        "date": "2026-06-15T04:50:20.795Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-15T05:00:16.048Z"
+      }
+    ],
+    "createdAt": "2026-06-15T03:33:12.334Z",
+    "activityHistory": [
+      {
+        "id": "act-1781499616048",
+        "activityType": "sell_item",
+        "reason": "Listed a pre-owned item on ReCircle",
+        "credits": 100,
+        "productName": "cap",
+        "category": "Clothing",
+        "size": null,
+        "photoUrl": "blob:http://localhost:5173/081e1d9a-31f4-4f90-a850-6caaeb0a4b1e",
+        "price": 299,
+        "date": "2026-06-15T05:00:16.048Z"
+      }
+    ]
   }
 ]

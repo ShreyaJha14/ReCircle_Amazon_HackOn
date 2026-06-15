@@ -62,6 +62,13 @@ const NavBar = () => {
                     🌱 My Impact
                   </Link>
                   <Link
+                    to="/donate"
+                    className="block px-4 py-2 text-sm hover:bg-gray-100"
+                    onClick={() => setShowMenu(false)}
+                  >
+                    💚 Donate
+                  </Link>
+                  <Link
                     to="/sustainability"
                     className="block px-4 py-2 text-sm hover:bg-gray-100"
                     onClick={() => setShowMenu(false)}
@@ -126,6 +133,9 @@ const NavBar = () => {
         <div>Sell</div>
         <Link to="/recircle">
           <div className="font-bold text-green-400">ReCircle</div>
+        </Link>
+        <Link to="/donate">
+          <div className="font-bold text-green-400">💚 Donate</div>
         </Link>
         {user && (
           <Link to="/my-impact">

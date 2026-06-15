@@ -41,6 +41,7 @@ router.post("/auth/login",          auth.login);
 router.get("/auth/me",              auth.getMe);
 router.post("/auth/credits/add",    auth.addCredits);
 router.post("/auth/credits/redeem", auth.redeemCredits);
+router.get("/auth/history/:userId",   auth.getUserHistory);
 
 // ── Products (Amazon catalogue) ───────────────────────────────────────────────
 router.get("/products", products.getProducts);

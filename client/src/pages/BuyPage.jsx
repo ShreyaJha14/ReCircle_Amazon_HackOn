@@ -1,21 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCartIcon, XMarkIcon, CheckCircleIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { useDispatch, useSelector } from "react-redux";
 import { GradeBadge, TrustScoreBadge, CarbonSavingIndicator, FloatingBackground } from "../components";
 import { addToCart } from "../redux/cartSlice";
 import { GB_CURRENCY } from "../utils/constants";
-import { getListings, updateListing } from "../utils/CallApi";
+import { getListings, redeemGreenCredits } from "../utils/CallApi";
 import { useGreenCredits } from "../utils/useGreenCredits";
-import { redeemGreenCredits } from "../utils/CallApi";
 import { updateUser } from "../redux/authSlice";
 
+// ── Static seed listings (always shown as baseline) ──────────────────────────
 const staticListings = [
   {
     id: "static-1",
+    listingId: "static-1",
     title: "Nike Air Max 270",
+    productName: "Nike Air Max 270",
     category: "Shoes",
     photo: null,
+    photoUrl: null,
     grade: "A",
     trustScore: 94,
     conditionLabel: "Like New",
@@ -25,9 +28,12 @@ const staticListings = [
   },
   {
     id: "static-2",
+    listingId: "static-2",
     title: "Philips Baby Monitor",
+    productName: "Philips Baby Monitor",
     category: "Baby Products",
     photo: null,
+    photoUrl: null,
     grade: "B",
     trustScore: 81,
     conditionLabel: "Good",
@@ -37,9 +43,12 @@ const staticListings = [
   },
   {
     id: "static-3",
+    listingId: "static-3",
     title: "Prestige Induction Cooktop",
+    productName: "Prestige Induction Cooktop",
     category: "Home & Kitchen",
     photo: null,
+    photoUrl: null,
     grade: "A",
     trustScore: 97,
     conditionLabel: "Like New",
@@ -48,6 +57,31 @@ const staticListings = [
     price: 1599,
   },
 ];
+
+// Normalise a backend listing object into the shape the UI expects
+function normalise(item) {
+  return {
+    id: item.listingId || item.id,
+    listingId: item.listingId || item.id,
+    title: item.productName || item.title,
+    productName: item.productName || item.title,
+    category: item.category,
+    photo: item.photoUrl || item.photo || null,
+    photoUrl: item.photoUrl || item.photo || null,
+    grade: item.grade || "A",
+    trustScore: item.trustScore || 80,
+    conditionLabel: item.conditionLabel || gradeToLabel(item.grade),
+    summary: item.summary || item.description || "",
+    carbonSavedKg: item.carbonSavedKg || 2,
+    price: parseFloat(item.price) || 0,
+    publishedAt: item.createdAt || item.publishedAt || new Date().toISOString(),
+    fromDb: true,   // flag so the UI can badge these as "JUST LISTED"
+  };
+}
+
+function gradeToLabel(grade) {
+  return { A: "Like New", B: "Good", C: "Fair", D: "Poor" }[grade] || "Good";
+}
 
 const categoryEmoji = {
   Shoes: "👟",
@@ -58,6 +92,7 @@ const categoryEmoji = {
   Other: "📦",
 };
 
+// ── Cart Drawer ───────────────────────────────────────────────────────────────
 const CartDrawer = ({ cartItems, onRemove, onCheckout, onClose }) => {
   const total = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
   return (
@@ -115,27 +150,24 @@ const CartDrawer = ({ cartItems, onRemove, onCheckout, onClose }) => {
   );
 };
 
-// ─── Order Modal ────────────────────────────────────────────────────────────
-const OrderModal = ({ item, onClose, onPurchased }) => {
+// ── Order Modal ───────────────────────────────────────────────────────────────
+const OrderModal = ({ item, onClose }) => {
   const dispatch = useDispatch();
   const auth = useSelector((s) => s.auth);
   const user = auth?.user;
   const token = auth?.token;
   const availableCredits = user?.greenCredits ?? 0;
 
-  const [orderStage, setOrderStage] = useState("confirm"); // confirm | placing | done
+  const [orderStage, setOrderStage] = useState("confirm");
   const [address, setAddress] = useState("");
   const [useCredits, setUseCredits] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("online"); // online | cod
+  const [paymentMethod, setPaymentMethod] = useState("online");
   const [creditsEarned, setCreditsEarned] = useState(0);
   const [finalBill, setFinalBill] = useState(item.price);
 
   const { awardCredits } = useGreenCredits();
 
-  // Recalculate bill whenever toggle changes
-  // discount = 10% of available credits (capped at item price)
-  const discountValue = +(availableCredits * 0.1).toFixed(2);
-  const discount = useCredits ? Math.min(discountValue, item.price) : 0;
+  const discount = useCredits ? Math.min(availableCredits, item.price) : 0;
   const billAfterCredits = Math.max(0, item.price - discount);
 
   const handlePlace = async () => {
@@ -144,28 +176,20 @@ const OrderModal = ({ item, onClose, onPurchased }) => {
     setOrderStage("placing");
 
     setTimeout(async () => {
-      // Mark the listing as sold in the database
-      try {
-        const listingId = item.listingId || item.id;
-        await updateListing(listingId, { status: "sold" });
-        if (onPurchased) onPurchased(listingId);
-      } catch (_) {
-        // If backend unreachable, still complete the flow
-      }
-
-      // Deduct credits if used
       if (useCredits && discount > 0 && user && token) {
         try {
-          const data = await redeemGreenCredits(user.id, availableCredits, token);
+          const data = await redeemGreenCredits(user.id, discount, token);
           dispatch(updateUser({ ...user, greenCredits: data.greenCredits }));
-        } catch (err) {
-          // Fallback: deduct locally
-          dispatch(updateUser({ ...user, greenCredits: 0 }));
+        } catch {
+          dispatch(updateUser({ ...user, greenCredits: Math.max(0, availableCredits - discount) }));
         }
       }
 
-      // Award +100 credits for buying
-      const earned = await awardCredits("buy_resell", `Purchased pre-owned item: ${item.title}`);
+      const earned = await awardCredits("buy_resell", `Purchased pre-owned item: ${item.title}`, {
+        productName: item.title,
+        category: item.category,
+        price: item.price,
+      });
       setCreditsEarned(earned || 100);
       setOrderStage("done");
     }, 2000);
@@ -183,7 +207,6 @@ const OrderModal = ({ item, onClose, onPurchased }) => {
           <XMarkIcon className="h-5 w-5" />
         </button>
 
-        {/* ── CONFIRM STAGE ── */}
         {orderStage === "confirm" && (
           <>
             <div className="text-xl font-bold text-white mb-1">Complete Your Order</div>
@@ -191,12 +214,10 @@ const OrderModal = ({ item, onClose, onPurchased }) => {
               You're buying: <span className="text-white font-semibold">{item.title}</span>
             </div>
 
-            {/* Credits earn reminder */}
             <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-2.5 mb-5 text-sm text-emerald-300">
               🌱 This purchase will earn you <span className="font-black text-emerald-400 ml-1">+100 Green Credits</span>!
             </div>
 
-            {/* Item summary */}
             <div className="flex gap-4 items-center bg-white/5 border border-white/10 rounded-xl p-4 mb-5">
               {item.photo ? (
                 <img src={item.photo} alt={item.title} className="h-16 w-16 object-cover rounded-lg flex-shrink-0" />
@@ -210,27 +231,15 @@ const OrderModal = ({ item, onClose, onPurchased }) => {
               </div>
             </div>
 
-            {/* ── Green Credits Redeem Checkbox ── */}
             {availableCredits > 0 && (
               <label
                 className={`flex items-start gap-3 rounded-xl p-4 mb-5 cursor-pointer border transition-all ${
-                  useCredits
-                    ? "bg-emerald-500/15 border-emerald-500/50"
-                    : "bg-white/5 border-white/10 hover:border-emerald-500/30"
+                  useCredits ? "bg-emerald-500/15 border-emerald-500/50" : "bg-white/5 border-white/10 hover:border-emerald-500/30"
                 }`}
               >
                 <div className="relative flex-shrink-0 mt-0.5">
-                  <input
-                    type="checkbox"
-                    checked={useCredits}
-                    onChange={(e) => setUseCredits(e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div
-                    className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-all ${
-                      useCredits ? "bg-emerald-500 border-emerald-500" : "border-white/30 bg-white/5"
-                    }`}
-                  >
+                  <input type="checkbox" checked={useCredits} onChange={(e) => setUseCredits(e.target.checked)} className="sr-only" />
+                  <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-all ${useCredits ? "bg-emerald-500 border-emerald-500" : "border-white/30 bg-white/5"}`}>
                     {useCredits && (
                       <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -245,14 +254,13 @@ const OrderModal = ({ item, onClose, onPurchased }) => {
                   </div>
                   <div className="text-xs text-white/50 mt-0.5">
                     You have <span className="text-emerald-400 font-bold">{availableCredits} credits</span> —
-                    worth <span className="text-emerald-400 font-bold">{GB_CURRENCY.format(discountValue)}</span>, save{" "}
+                    redeem <span className="text-emerald-400 font-bold">{discount} credits</span> to save{" "}
                     <span className="text-emerald-400 font-bold">{GB_CURRENCY.format(discount)}</span> off this order
                   </div>
                 </div>
               </label>
             )}
 
-            {/* Delivery Address */}
             <label className="block text-sm font-semibold mb-2 text-white/80">Delivery Address</label>
             <textarea
               rows={3}
@@ -262,48 +270,32 @@ const OrderModal = ({ item, onClose, onPurchased }) => {
               className="w-full p-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/40 mb-5 focus:outline-none focus:border-[#FF9900] resize-none"
             />
 
-            {/* ── Payment Method ── */}
             <label className="block text-sm font-semibold mb-3 text-white/80">Payment Method</label>
             <div className="flex gap-3 mb-5">
-              {/* Online Payment */}
               <button
                 onClick={() => setPaymentMethod("online")}
-                className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${
-                  paymentMethod === "online"
-                    ? "bg-[#FF9900]/15 border-[#FF9900] text-[#FF9900]"
-                    : "bg-white/5 border-white/15 text-white/60 hover:border-white/30"
-                }`}
+                className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${paymentMethod === "online" ? "bg-[#FF9900]/15 border-[#FF9900] text-[#FF9900]" : "bg-white/5 border-white/15 text-white/60 hover:border-white/30"}`}
               >
                 <span className="text-base">💳</span>
                 <div className="text-left">
                   <div>Pay Online</div>
                   <div className="text-[10px] font-normal opacity-70">UPI / Card / Net Banking</div>
                 </div>
-                {paymentMethod === "online" && (
-                  <CheckCircleIcon className="h-4 w-4 ml-auto flex-shrink-0" />
-                )}
+                {paymentMethod === "online" && <CheckCircleIcon className="h-4 w-4 ml-auto flex-shrink-0" />}
               </button>
-              {/* Cash on Delivery */}
               <button
                 onClick={() => setPaymentMethod("cod")}
-                className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${
-                  paymentMethod === "cod"
-                    ? "bg-emerald-500/15 border-emerald-500 text-emerald-400"
-                    : "bg-white/5 border-white/15 text-white/60 hover:border-white/30"
-                }`}
+                className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${paymentMethod === "cod" ? "bg-emerald-500/15 border-emerald-500 text-emerald-400" : "bg-white/5 border-white/15 text-white/60 hover:border-white/30"}`}
               >
                 <span className="text-base">💵</span>
                 <div className="text-left">
                   <div>Cash on Delivery</div>
                   <div className="text-[10px] font-normal opacity-70">Pay when you receive</div>
                 </div>
-                {paymentMethod === "cod" && (
-                  <CheckCircleIcon className="h-4 w-4 ml-auto flex-shrink-0" />
-                )}
+                {paymentMethod === "cod" && <CheckCircleIcon className="h-4 w-4 ml-auto flex-shrink-0" />}
               </button>
             </div>
 
-            {/* Bill summary */}
             <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-5">
               <div className="flex justify-between text-sm text-white/60 mb-2">
                 <span>Item Price</span>
@@ -342,7 +334,6 @@ const OrderModal = ({ item, onClose, onPurchased }) => {
           </>
         )}
 
-        {/* ── PLACING STAGE ── */}
         {orderStage === "placing" && (
           <div className="text-center py-10">
             <div className="flex justify-center mb-5">
@@ -353,23 +344,14 @@ const OrderModal = ({ item, onClose, onPurchased }) => {
           </div>
         )}
 
-        {/* ── DONE STAGE ── */}
         {orderStage === "done" && (
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-4">
-            <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 0.4 }} className="text-5xl mb-4">
-              🎉
-            </motion.div>
+            <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 0.4 }} className="text-5xl mb-4">🎉</motion.div>
             <div className="text-xl font-bold text-white mb-1">Order Confirmed!</div>
             <div className="text-white/60 text-sm mb-1">{item.title} is on its way to you.</div>
-            <div className="text-green-400 text-xs mb-4">
-              🌱 You saved approximately {item.carbonSavedKg} kg CO₂ by buying pre-owned!
-            </div>
+            <div className="text-green-400 text-xs mb-4">🌱 You saved approximately {item.carbonSavedKg} kg CO₂ by buying pre-owned!</div>
 
-            {/* Credits awarded */}
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 mb-4"
             >
               <span className="text-xl">🌱</span>
@@ -379,48 +361,27 @@ const OrderModal = ({ item, onClose, onPurchased }) => {
               </div>
             </motion.div>
 
-            {/* COD message */}
             {paymentMethod === "cod" && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
                 className="bg-amber-400/10 border border-amber-400/30 rounded-2xl px-5 py-4 mb-5 text-left"
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg">💵</span>
-                  <span className="text-amber-400 font-bold text-sm">Cash on Delivery</span>
-                </div>
-                <p className="text-white/80 text-sm leading-relaxed">
-                  Amount <span className="text-amber-400 font-black text-base">{GB_CURRENCY.format(finalBill)}</span> to be paid at the time of delivering.
-                </p>
+                <div className="flex items-center gap-2 mb-1"><span className="text-lg">💵</span><span className="text-amber-400 font-bold text-sm">Cash on Delivery</span></div>
+                <p className="text-white/80 text-sm leading-relaxed">Amount <span className="text-amber-400 font-black text-base">{GB_CURRENCY.format(finalBill)}</span> to be paid at the time of delivering.</p>
                 <p className="text-emerald-400 font-semibold text-sm mt-2">Happy Shopping! 🛍️</p>
               </motion.div>
             )}
 
-            {/* Online success message */}
             {paymentMethod === "online" && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
                 className="bg-[#FF9900]/10 border border-[#FF9900]/30 rounded-2xl px-5 py-4 mb-5 text-left"
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg">💳</span>
-                  <span className="text-[#FF9900] font-bold text-sm">Payment Successful</span>
-                </div>
-                <p className="text-white/80 text-sm leading-relaxed">
-                  <span className="text-[#FF9900] font-black text-base">{GB_CURRENCY.format(finalBill)}</span> has been charged successfully.
-                </p>
+                <div className="flex items-center gap-2 mb-1"><span className="text-lg">💳</span><span className="text-[#FF9900] font-bold text-sm">Payment Successful</span></div>
+                <p className="text-white/80 text-sm leading-relaxed"><span className="text-[#FF9900] font-black text-base">{GB_CURRENCY.format(finalBill)}</span> has been charged successfully.</p>
                 <p className="text-emerald-400 font-semibold text-sm mt-2">Happy Shopping! 🛍️</p>
               </motion.div>
             )}
 
-            <button
-              onClick={onClose}
-              className="px-8 py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition"
-            >
+            <button onClick={onClose} className="px-8 py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition">
               Continue Shopping
             </button>
           </motion.div>
@@ -430,64 +391,47 @@ const OrderModal = ({ item, onClose, onPurchased }) => {
   );
 };
 
-// ─── Main BuyPage ────────────────────────────────────────────────────────────
+// ── Main BuyPage ──────────────────────────────────────────────────────────────
 const BuyPage = () => {
   const dispatch = useDispatch();
-  const [allListings, setAllListings] = useState([]);
+  const [dbListings, setDbListings] = useState([]);      // listings from the central DB
+  const [loadingDb, setLoadingDb] = useState(true);
   const [cartItems, setCartItems] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [orderItem, setOrderItem] = useState(null);
   const [addedId, setAddedId] = useState(null);
   const [filter, setFilter] = useState("All");
-  const [loadingListings, setLoadingListings] = useState(true);
 
-  const fetchListings = async () => {
+  // Fetch from backend DB — runs on mount and every 10 s so newly published
+  // items from any user/session appear automatically.
+  const fetchDbListings = useCallback(async () => {
     try {
-      const data = await getListings({ limit: "50" });
-      const apiListings = (data.listings || []).map((l) => ({
-        id: l.listingId,
-        listingId: l.listingId,
-        title: l.productName,
-        category: l.category,
-        photo: l.photoUrl || null,
-        grade: l.grade,
-        trustScore: l.trustScore,
-        conditionLabel: l.conditionLabel || "Pre-owned",
-        summary: l.description || "",
-        carbonSavedKg: l.carbonSavedKg || 2,
-        price: l.price,
-        publishedAt: l.createdAt,
-        status: l.status,
-      }));
-      setAllListings([...apiListings, ...staticListings]);
-    } catch (_) {
-      // Backend unreachable — show static listings only
-      setAllListings([...staticListings]);
+      const res = await getListings({ limit: 50 });
+      const items = (res?.listings || []).map(normalise);
+      setDbListings(items);
+    } catch {
+      // Backend unavailable — silently fall back to static listings only
     } finally {
-      setLoadingListings(false);
+      setLoadingDb(false);
     }
-  };
-
-  const handlePurchased = (listingId) => {
-    setAllListings((prev) =>
-      prev.map((l) =>
-        (l.listingId === listingId || l.id === listingId)
-          ? { ...l, status: "sold" }
-          : l
-      )
-    );
-    setOrderItem(null);
-  };
-
-  useEffect(() => {
-    fetchListings();
-    const interval = setInterval(fetchListings, 10000);
-    return () => clearInterval(interval);
   }, []);
 
-  const categories = ["All", ...new Set(allListings.map((l) => l.category))];
-  const filtered = (filter === "All" ? allListings : allListings.filter((l) => l.category === filter))
-    .filter((l) => l.status !== "sold");
+  useEffect(() => {
+    fetchDbListings();
+    const interval = setInterval(fetchDbListings, 10_000);
+    return () => clearInterval(interval);
+  }, [fetchDbListings]);
+
+  // Merge: DB listings first (newest first), then static ones that aren't already covered
+  const staticIds = new Set(staticListings.map((s) => s.id));
+  const dbIds = new Set(dbListings.map((l) => l.id));
+  const mergedListings = [
+    ...dbListings,
+    ...staticListings.filter((s) => !dbIds.has(s.id)),
+  ];
+
+  const categories = ["All", ...new Set(mergedListings.map((l) => l.category))];
+  const filtered = filter === "All" ? mergedListings : mergedListings.filter((l) => l.category === filter);
 
   const handleAddToCart = (item) => {
     dispatch(addToCart({
@@ -508,10 +452,7 @@ const BuyPage = () => {
     setTimeout(() => setAddedId(null), 1500);
   };
 
-  const handleRemoveFromCart = (id) => {
-    setCartItems((prev) => prev.filter((p) => p.id !== id));
-  };
-
+  const handleRemoveFromCart = (id) => setCartItems((prev) => prev.filter((p) => p.id !== id));
   const cartTotal = cartItems.length;
 
   return (
@@ -550,6 +491,14 @@ const BuyPage = () => {
           </button>
         </motion.div>
 
+        {/* Loading indicator for DB listings */}
+        {loadingDb && (
+          <div className="flex items-center gap-2 text-xs text-white/40 mb-4">
+            <div className="w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+            Loading listings from database…
+          </div>
+        )}
+
         {/* Category filter */}
         <div className="flex gap-2 flex-wrap mb-6">
           {categories.map((cat) => (
@@ -570,7 +519,7 @@ const BuyPage = () => {
         {/* Listings grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filtered.map((item, i) => {
-            const isNew = !!item.listingId; // items from API have listingId; static ones don't
+            const isNew = item.fromDb && !staticIds.has(item.id);
             return (
               <motion.div
                 key={item.id}
@@ -636,14 +585,7 @@ const BuyPage = () => {
           })}
         </div>
 
-        {loadingListings && (
-          <div className="text-center py-20 text-white/40">
-            <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <div>Loading listings…</div>
-          </div>
-        )}
-
-        {!loadingListings && filtered.length === 0 && (
+        {filtered.length === 0 && (
           <div className="text-center py-20 text-white/40">
             <div className="text-4xl mb-3">🛒</div>
             <div>No listings in this category yet.</div>
@@ -651,7 +593,6 @@ const BuyPage = () => {
         )}
       </div>
 
-      {/* Cart Drawer */}
       <AnimatePresence>
         {showCart && (
           <>
@@ -670,11 +611,8 @@ const BuyPage = () => {
         )}
       </AnimatePresence>
 
-      {/* Order Modal */}
       <AnimatePresence>
-        {orderItem && (
-          <OrderModal item={orderItem} onClose={() => setOrderItem(null)} onPurchased={handlePurchased} />
-        )}
+        {orderItem && <OrderModal item={orderItem} onClose={() => setOrderItem(null)} />}
       </AnimatePresence>
     </div>
   );

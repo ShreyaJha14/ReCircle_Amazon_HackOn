@@ -281,6 +281,137 @@ function buildHeuristicPrediction(category, history) {
   };
 }
 
+// ── Cart Health Analysis — Feature 4 dashboard ───────────────────────────────
+export async function analyzeCart(req, res) {
+  try {
+    const { items, userId } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "items array is required" });
+    }
+
+    const prompt = `
+You are a cart health AI for ReCircle, Amazon's circular commerce platform.
+
+A customer has the following items in their cart:
+${items.map((it, i) => `${i + 1}. "${it.name}" — category: ${it.category || "General"}, price: ${it.price || "unknown"}`).join("\n")}
+
+For EACH item, analyse:
+- returnProbability (0–100, where 100 = certain return)
+- sizeConfidence (0–100, where 100 = perfect fit certainty)
+- sellerQuality (0–100)
+- customerHistoryScore (0–100, how well this matches typical safe purchases)
+- riskLevel: "safe" | "medium" | "high"
+- reasons: array of up to 2 short strings explaining any risk
+- recommendation: one actionable tip for the buyer (or null if safe)
+
+Then provide an overall cartHealthScore (0–100, where 100 = no risk at all).
+
+Respond ONLY with valid JSON in this exact shape:
+{
+  "cartHealthScore": <integer>,
+  "cartSummary": "<one sentence about the overall cart health>",
+  "items": [
+    {
+      "index": <0-based integer matching input order>,
+      "returnProbability": <integer 0–100>,
+      "sizeConfidence": <integer 0–100>,
+      "sellerQuality": <integer 0–100>,
+      "customerHistoryScore": <integer 0–100>,
+      "safeScore": <integer 0–100, overall item health>,
+      "riskLevel": "safe" | "medium" | "high",
+      "reasons": [<string>, ...],
+      "recommendation": "<string or null>"
+    }
+  ]
+}
+`;
+
+    let analysis;
+    try {
+      const aiText = await invokeClaudeText(prompt, {
+        model: BEDROCK_MODELS.CLAUDE_HAIKU,
+        maxTokens: 1024,
+        systemPrompt: "You are a cart risk analyst. Respond only with valid JSON, no markdown, no explanation.",
+      });
+      analysis = extractJSON(aiText);
+    } catch (e) {
+      console.warn("Bedrock cart analysis failed, using heuristic:", e.message);
+      analysis = buildHeuristicCartAnalysis(items);
+    }
+
+    if (!analysis) analysis = buildHeuristicCartAnalysis(items);
+
+    // Attach original item names back to results
+    if (analysis.items) {
+      analysis.items = analysis.items.map((result, i) => ({
+        ...result,
+        name: items[result.index ?? i]?.name ?? items[i]?.name ?? "Item",
+        image: items[result.index ?? i]?.image ?? null,
+        id: items[result.index ?? i]?.id ?? String(i),
+      }));
+    }
+
+    return res.json({ success: true, analysis });
+  } catch (err) {
+    console.error("analyzeCart error:", err);
+    return res.status(500).json({ error: "Cart analysis failed." });
+  }
+}
+
+function buildHeuristicCartAnalysis(items) {
+  const HIGH_RETURN_CATS = ["clothing", "shoes", "apparel", "fashion"];
+  const MED_RETURN_CATS = ["accessories", "beauty", "home"];
+
+  const analysedItems = items.map((item, i) => {
+    const cat = (item.category || item.name || "").toLowerCase();
+    const isHigh = HIGH_RETURN_CATS.some((c) => cat.includes(c));
+    const isMed = MED_RETURN_CATS.some((c) => cat.includes(c));
+
+    const returnProb = isHigh ? 38 : isMed ? 20 : 10;
+    const sizeConf = isHigh ? 60 : 92;
+    const sellerQuality = 80;
+    const customerHistoryScore = 78;
+    const safeScore = Math.round(
+      (100 - returnProb) * 0.35 + sizeConf * 0.30 + sellerQuality * 0.20 + customerHistoryScore * 0.15
+    );
+    const riskLevel = safeScore >= 75 ? "safe" : safeScore >= 55 ? "medium" : "high";
+    const reasons = [];
+    if (isHigh) reasons.push("High return rate in this category", "Size uncertainty");
+    else if (isMed) reasons.push("Moderate return rate in category");
+
+    return {
+      index: i,
+      id: item.id ?? String(i),
+      name: item.name,
+      image: item.image ?? null,
+      returnProbability: returnProb,
+      sizeConfidence: sizeConf,
+      sellerQuality,
+      customerHistoryScore,
+      safeScore,
+      riskLevel,
+      reasons,
+      recommendation: isHigh ? "Check the size guide before ordering." : null,
+    };
+  });
+
+  const cartHealthScore = Math.round(
+    analysedItems.reduce((s, a) => s + a.safeScore, 0) / analysedItems.length
+  );
+
+  return {
+    cartHealthScore,
+    cartSummary:
+      cartHealthScore >= 75
+        ? "Your cart looks great — low return risk across all items."
+        : cartHealthScore >= 55
+        ? "Some items carry moderate return risk. Review recommendations before purchasing."
+        : "Several items have high return risk. Please review before proceeding.",
+    items: analysedItems,
+  };
+}
+
 function buildHeuristicPricing(grade, originalPrice) {
   const discounts = { A: 0.30, B: 0.45, C: 0.60, D: 0.75 };
   const disc = discounts[grade] || 0.45;

@@ -8,3 +8,4 @@ export { default as ReturnedProductsPage } from "./ReturnedProductsPage";
 export { default as ResellProductsPage } from "./ResellProductsPage";
 export { default as SellPage } from "./SellPage";
 export { default as BuyPage } from "./BuyPage";
+export { default as DonatePage } from "./DonatePage";

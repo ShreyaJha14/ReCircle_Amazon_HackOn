@@ -28,9 +28,13 @@ export async function createListing(req, res) {
       photoUrl,
       originalPrice,
       suggestedPrice,
-      location,   // { lat, lng, postcode, city }
+      location,
       description,
       passportId,
+      routeLabel,
+      returnReason,
+      conditionLabel,
+      carbonSavedKg,
     } = req.body;
 
     if (!productName || !grade) {
@@ -76,6 +80,10 @@ Price: £${price}. Be honest about condition, highlight value. No markdown.`,
       description: aiDescription,
       passportId: passportId || null,
       location: location || { city: "UK", postcode: "Unknown" },
+      routeLabel: routeLabel || "AI Verified → ReCircle Zone",
+      returnReason: returnReason || "Listed via Sell page",
+      conditionLabel: conditionLabel || "Like New",
+      carbonSavedKg: parseFloat(carbonSavedKg) || 0,
       status: "active",
       views: 0,
       createdAt: now,
@@ -94,10 +102,10 @@ Price: £${price}. Be honest about condition, highlight value. No markdown.`,
   }
 }
 
-// ── Get all active listings (with optional category/grade filters) ─────────────
+// ── Get all active listings (with optional category/grade/today filters) ───────
 export async function getListings(req, res) {
   try {
-    const { category, grade, limit = "20" } = req.query;
+    const { category, grade, limit = "20", today } = req.query;
 
     // For hackathon: scan with optional filter
     const filterParts = ["#s = :active"];
@@ -113,20 +121,37 @@ export async function getListings(req, res) {
       exprVals[":grade"] = grade;
     }
 
-    const result = await dynamo.send(
-      new ScanCommand({
+    // Filter to listings published on the current calendar day (UTC)
+    if (today === "true") {
+      const startOfDay = new Date();
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      filterParts.push("createdAt >= :startOfDay");
+      exprVals[":startOfDay"] = startOfDay.toISOString();
+    }
+
+    // Paginate through ALL pages of the table so FilterExpression sees every item.
+    // (DynamoDB's Limit caps *reads*, not *results*, so a Limit would skip items.)
+    let allItems = [];
+    let lastKey = undefined;
+    do {
+      const params = {
         TableName: TABLES.LISTINGS,
         FilterExpression: filterParts.join(" AND "),
         ExpressionAttributeNames: exprNames,
         ExpressionAttributeValues: exprVals,
-        Limit: parseInt(limit),
-      })
-    );
+      };
+      if (lastKey) params.ExclusiveStartKey = lastKey;
 
-    // Sort by createdAt desc
-    const items = (result.Items || []).sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
+      const page = await dynamo.send(new ScanCommand(params));
+      allItems = allItems.concat(page.Items || []);
+      lastKey = page.LastEvaluatedKey;
+    } while (lastKey);
+
+    // Sort by createdAt desc and honour the limit *after* filtering
+    const maxItems = parseInt(limit) || 100;
+    const items = allItems
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, maxItems);
 
     return res.json({ success: true, listings: items, count: items.length });
   } catch (err) {

@@ -14,9 +14,11 @@ const SellPage = () => {
   const [category, setCategory] = useState("");
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoBase64, setPhotoBase64] = useState(null);
   const [gradingResult, setGradingResult] = useState(null);
   const [price, setPrice] = useState("");
   const [isGrading, setIsGrading] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [errors, setErrors] = useState({});
   const [creditsEarned, setCreditsEarned] = useState(0);
 
@@ -26,13 +28,22 @@ const SellPage = () => {
     const file = e.target.files?.[0];
     if (file) {
       setPhoto(file);
-      // Read as base64 data URL so it can be stored in DB and shown to all users
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        setPhotoPreview(ev.target.result);
-      };
-      reader.readAsDataURL(file);
+      setPhotoPreview(URL.createObjectURL(file));
       setErrors((prev) => ({ ...prev, photo: null }));
+      // Convert to base64 (resized to max 400px) so it can be stored in the database
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        const MAX = 400;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        setPhotoBase64(canvas.toDataURL("image/jpeg", 0.75));
+        URL.revokeObjectURL(objectUrl);
+      };
+      img.src = objectUrl;
     }
   };
 
@@ -90,29 +101,44 @@ const SellPage = () => {
   };
 
   const handlePublish = async () => {
-    const listing = {
-      productName,
-      category,
-      photoUrl: photoPreview,
-      grade: gradingResult?.grading?.grade || "A",
-      trustScore: gradingResult?.grading?.trustScore || 90,
-      conditionLabel: gradingResult?.grading?.conditionLabel || "Like New",
-      description: gradingResult?.grading?.summary || "",
-      carbonSavedKg: gradingResult?.grading?.carbonSavedKg || 2,
-      suggestedPrice: parseFloat(price) || 0,
-    };
-
+    setIsPublishing(true);
     try {
-      await createListing(listing);
-    } catch (_) {
-      // If backend is unreachable, silently continue (demo mode)
+      const numericPrice = parseFloat(price) || 0;
+      const discountPct = gradingResult?.grading?.estimatedResaleDiscountPct || 35;
+      const denom = 1 - discountPct / 100;
+      const estimatedOldPrice = denom > 0 ? +(numericPrice / denom).toFixed(2) : +(numericPrice * 2).toFixed(2);
+
+      // Save listing to the database
+      await createListing({
+        productName,
+        category,
+        grade: gradingResult?.grading?.grade || "A",
+        trustScore: gradingResult?.grading?.trustScore || 90,
+        photoUrl: photoBase64 || null,
+        originalPrice: estimatedOldPrice,
+        suggestedPrice: numericPrice,
+        routeLabel: gradingResult?.routing?.routeLabel || "AI Verified → ReCircle Zone",
+        returnReason: "Listed via Sell page",
+        conditionLabel: gradingResult?.grading?.conditionLabel || "Like New",
+        carbonSavedKg: gradingResult?.grading?.carbonSavedKg || 2,
+        sellerId: user?.userId || "anonymous",
+      });
+
+      // Award +100 credits for listing an item
+      const earned = await awardCredits("sell_item", "Listed a pre-owned item on ReCircle", {
+        productName,
+        category,
+        photoUrl: photoPreview,
+        price: numericPrice,
+      });
+      setCreditsEarned(earned || 100);
+
+      setStep("done");
+    } catch (err) {
+      console.error("Failed to publish listing:", err);
+    } finally {
+      setIsPublishing(false);
     }
-
-    // Award +100 credits for listing an item
-    const earned = await awardCredits("sell_item", "Listed a pre-owned item on ReCircle");
-    setCreditsEarned(earned || 100);
-
-    setStep("done");
   };
 
   const reset = () => {
@@ -125,6 +151,7 @@ const SellPage = () => {
     setPrice("");
     setErrors({});
     setCreditsEarned(0);
+    setPhotoBase64(null);
   };
 
   const grading = gradingResult?.grading;
@@ -398,10 +425,17 @@ const SellPage = () => {
 
                 <button
                   onClick={handlePublish}
-                  disabled={!price || parseFloat(price) <= 0}
+                  disabled={!price || parseFloat(price) <= 0 || isPublishing}
                   className="w-full py-4 rounded-xl bg-emerald-500 text-white font-bold text-lg hover:bg-emerald-600 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  🚀 Publish Listing — Go Live
+                  {isPublishing ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Publishing…
+                    </>
+                  ) : (
+                    "🚀 Publish Listing — Go Live"
+                  )}
                 </button>
                 <p className="text-center text-xs text-white/40 mt-3">Your item will be immediately visible on the Buy page.</p>
               </div>

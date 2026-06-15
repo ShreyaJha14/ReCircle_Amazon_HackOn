@@ -71,6 +71,11 @@ export const suggestPrice = (payload) =>
 export const getPreventionMetrics = () =>
   axios.get(`${BASE_URL}/prevention/metrics`, config).then((r) => r.data);
 
+export const analyzeCart = (items = [], userId = null) =>
+  axios
+    .post(`${BASE_URL}/prevention/cart-analysis`, { items, userId }, config)
+    .then((r) => r.data);
+
 // ── Sustainability ────────────────────────────────────────────────────────────
 export const getSustainabilityDashboard = () =>
   axios.get(`${BASE_URL}/sustainability/dashboard`, config).then((r) => r.data);
@@ -88,8 +93,8 @@ export const getMe = (token) =>
     headers: { ...config.headers, Authorization: `Bearer ${token}` },
   }).then((r) => r.data);
 
-export const addGreenCredits = (userId, amount, reason, token) =>
-  axios.post(`${BASE_URL}/auth/credits/add`, { userId, amount, reason }, {
+export const addGreenCredits = (userId, amount, reason, token, activityType, meta) =>
+  axios.post(`${BASE_URL}/auth/credits/add`, { userId, amount, reason, activityType, meta }, {
     ...config,
     headers: { ...config.headers, Authorization: `Bearer ${token}` },
   }).then((r) => r.data);
@@ -110,5 +115,17 @@ export const createListing = (payload) =>
 export const getNearbyMatches = (params = {}) =>
   axios.get(`${BASE_URL}/listings/nearby`, { ...config, params }).then((r) => r.data);
 
-export const updateListing = (listingId, payload) =>
-  axios.patch(`${BASE_URL}/listings/${listingId}`, payload, config).then((r) => r.data);
+export const getUserHistory = (userId, token) =>
+  axios.get(`${BASE_URL}/auth/history/${userId}`, {
+    ...config,
+    headers: { ...config.headers, Authorization: `Bearer ${token}` },
+  }).then((r) => r.data);
+
+export const updateListing = (listingId, payload, token) =>
+  axios.patch(`${BASE_URL}/listings/${listingId}`, payload, {
+    ...config,
+    headers: { ...config.headers, Authorization: `Bearer ${token}` },
+  }).then((r) => r.data);
+
+export const getTodaysListings = () =>
+  axios.get(`${BASE_URL}/listings`, { params: { today: "true", limit: "100" } })

@@ -20,6 +20,7 @@ import {
   BuyPage,
 } from "./pages";
 import MyImpactPage from "./pages/MyImpactPage";
+import DonatePage from "./pages/DonatePage";
 
 const App = () => {
   return (
@@ -39,6 +40,7 @@ const App = () => {
           <Route path="/prevention" element={<PreventionPage />} />
           <Route path="/sustainability" element={<SustainabilityPage />} />
           <Route path="/my-impact" element={<MyImpactPage />} />
+          <Route path="/donate" element={<DonatePage />} />
         </Route>
         <Route path="/search" element={<SearchResults />} />
         <Route path="/product/:id" element={<ProductPage />} />
