@@ -6,18 +6,10 @@ import { useEffect, useState } from "react";
 import { Modal, GradeBadge, TrustScoreBadge, CarbonSavingIndicator } from "./";
 import { gradeItem, routeItem, createPassport } from "../utils/CallApi";
 
-const createFallbackCertifiedId = () => {
-  const year = new Date().getFullYear();
-  const suffix = String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
-  return `RC-AI-${year}-${suffix}`;
-};
-
 const AllInspectionModal = ({ onClose, item }) => {
   const [stage, setStage] = useState("analysing"); // "analysing" | "complete" | "error"
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [aiCertifiedId, setAICertifiedId] = useState("");
-  const [copyStatus, setCopyStatus] = useState("");
 
   useEffect(() => {
     async function runInspection() {
@@ -30,7 +22,6 @@ const AllInspectionModal = ({ onClose, item }) => {
 
         // 1. AI Grade the item
         const gradingRes = await gradeItem(formData);
-        const certifiedId = gradingRes.aiCertifiedId || createFallbackCertifiedId();
 
         // 2. Get smart routing decision (fire-and-forget style)
         let routingRes = null;
@@ -58,11 +49,9 @@ const AllInspectionModal = ({ onClose, item }) => {
         } catch (_) {}
 
         setResult({ grading: gradingRes.grading, routing: routingRes, passport: passportRes });
-        setAICertifiedId(certifiedId);
         setStage("complete");
       } catch (err) {
         console.error("Inspection failed:", err);
-        const fallbackId = createFallbackCertifiedId();
         // Graceful fallback with demo data so the demo always works
         setResult({
           grading: {
@@ -78,7 +67,6 @@ const AllInspectionModal = ({ onClose, item }) => {
           routing: { routeLabel: "AI Verified → ReCircle Zone" },
           passport: null,
         });
-        setAICertifiedId(fallbackId);
         setStage("complete");
       }
     }
@@ -87,18 +75,6 @@ const AllInspectionModal = ({ onClose, item }) => {
   }, []);
 
   const grading = result?.grading;
-
-  const handleCopyCertifiedId = async () => {
-    if (!aiCertifiedId) return;
-    try {
-      await navigator.clipboard.writeText(aiCertifiedId);
-      setCopyStatus("Copied!");
-      window.setTimeout(() => setCopyStatus(""), 1800);
-    } catch (err) {
-      setCopyStatus("Copy failed");
-      window.setTimeout(() => setCopyStatus(""), 1800);
-    }
-  };
 
   return (
     <Modal title="ReCircle — AI Inspection" onClose={onClose} icon="🤖">
@@ -144,24 +120,6 @@ const AllInspectionModal = ({ onClose, item }) => {
               RRP via ReCircle.
             </div>
           </div>
-
-          {aiCertifiedId && (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-900/80 border border-white/10 rounded-xl p-4 mb-4">
-              <div>
-                <div className="text-xs uppercase tracking-[0.2em] text-emerald-400 font-semibold mb-1">
-                  AI Certified ID
-                </div>
-                <div className="text-sm text-white font-semibold">{aiCertifiedId}</div>
-              </div>
-              <button
-                onClick={handleCopyCertifiedId}
-                className="px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition"
-              >
-                Copy ID
-              </button>
-            </div>
-          )}
-          {copyStatus && <div className="text-xs text-emerald-300 mb-3">{copyStatus}</div>}
 
           {result?.passport && (
             <div className="bg-green-50 border border-green-200 rounded p-3 text-sm mb-4">
