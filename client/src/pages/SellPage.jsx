@@ -2,9 +2,13 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CameraIcon, CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import { GradeBadge, TrustScoreBadge, CarbonSavingIndicator, FloatingBackground } from "../components";
-import { gradeItem, routeItem, createListing } from "../utils/CallApi";
+import { gradeItem, routeItem } from "../utils/CallApi";
 import { GB_CURRENCY } from "../utils/constants";
 import { useGreenCredits } from "../utils/useGreenCredits";
+import { Link } from "react-router-dom";
+
+// Shared in-memory store for published listings (exported so BuyPage can import it)
+export const publishedListings = [];
 
 const STEPS = ["details", "grading", "publish", "done"];
 
@@ -12,16 +16,21 @@ const SellPage = () => {
   const [step, setStep] = useState("details");
   const [productName, setProductName] = useState("");
   const [category, setCategory] = useState("");
-  const [size, setSize] = useState("");
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [photoBase64, setPhotoBase64] = useState(null);
   const [gradingResult, setGradingResult] = useState(null);
+  const [aiCertifiedId, setAICertifiedId] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
   const [price, setPrice] = useState("");
   const [isGrading, setIsGrading] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
   const [errors, setErrors] = useState({});
   const [creditsEarned, setCreditsEarned] = useState(0);
+
+  const createFallbackCertifiedId = () => {
+    const year = new Date().getFullYear();
+    const suffix = String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
+    return `RC-AI-${year}-${suffix}`;
+  };
 
   const { awardCredits, user } = useGreenCredits();
 
@@ -31,20 +40,6 @@ const SellPage = () => {
       setPhoto(file);
       setPhotoPreview(URL.createObjectURL(file));
       setErrors((prev) => ({ ...prev, photo: null }));
-      // Convert to base64 (resized to max 400px) so it can be stored in the database
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-      img.onload = () => {
-        const MAX = 400;
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        setPhotoBase64(canvas.toDataURL("image/jpeg", 0.75));
-        URL.revokeObjectURL(objectUrl);
-      };
-      img.src = objectUrl;
     }
   };
 
@@ -52,11 +47,6 @@ const SellPage = () => {
     const newErrors = {};
     if (!productName.trim()) newErrors.productName = "Product name is required.";
     if (!category) newErrors.category = "Please select a category.";
-    if (
-      ["Clothing", "Shoes"].includes(category) && !size
-    ) {
-      newErrors.size = "Please select a size.";
-    }
     if (!photo) newErrors.photo = "Please upload a product photo.";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -72,7 +62,6 @@ const SellPage = () => {
       if (photo) formData.append("photo", photo);
       formData.append("productName", productName);
       formData.append("category", category);
-      formData.append("size", size);
 
       const gradingRes = await gradeItem(formData);
 
@@ -87,8 +76,11 @@ const SellPage = () => {
       } catch (_) {}
 
       setGradingResult({ grading: gradingRes.grading, routing: routingRes });
+      setAICertifiedId(gradingRes.aiCertifiedId || "");
     } catch (_) {
       // Demo fallback
+      const fallbackId = createFallbackCertifiedId();
+      setAICertifiedId(fallbackId);
       setGradingResult({
         grading: {
           grade: "A",
@@ -108,62 +100,56 @@ const SellPage = () => {
   };
 
   const handlePublish = async () => {
-    setIsPublishing(true);
-    try {
-      const numericPrice = parseFloat(price) || 0;
-      const discountPct = gradingResult?.grading?.estimatedResaleDiscountPct || 35;
-      const denom = 1 - discountPct / 100;
-      const estimatedOldPrice = denom > 0 ? +(numericPrice / denom).toFixed(2) : +(numericPrice * 2).toFixed(2);
+    const listing = {
+      id: Date.now(),
+      title: productName,
+      category,
+      photo: photoPreview,
+      grade: gradingResult?.grading?.grade || "A",
+      trustScore: gradingResult?.grading?.trustScore || 90,
+      conditionLabel: gradingResult?.grading?.conditionLabel || "Like New",
+      summary: gradingResult?.grading?.summary || "",
+      carbonSavedKg: gradingResult?.grading?.carbonSavedKg || 2,
+      price: parseFloat(price) || 0,
+      aiCertifiedId,
+      publishedAt: new Date().toISOString(),
+    };
+    publishedListings.unshift(listing);
 
-      // Save listing to the database
-      await createListing({
-        productName,
-        category,
-        size,
-        grade: gradingResult?.grading?.grade || "A",
-        trustScore: gradingResult?.grading?.trustScore || 90,
-        photoUrl: photoBase64 || null,
-        originalPrice: estimatedOldPrice,
-        suggestedPrice: numericPrice,
-        routeLabel: gradingResult?.routing?.routeLabel || "AI Verified → ReCircle Zone",
-        returnReason: "Listed via Sell page",
-        conditionLabel: gradingResult?.grading?.conditionLabel || "Like New",
-        carbonSavedKg: gradingResult?.grading?.carbonSavedKg || 2,
-        sellerId: user?.userId || "anonymous",
-      });
+    // Award +100 credits for listing an item
+    const earned = await awardCredits("sell_item", "Listed a pre-owned item on ReCircle");
+    setCreditsEarned(earned || 100);
 
-      // Award +100 credits for listing an item
-      const earned = await awardCredits("sell_item", "Listed a pre-owned item on ReCircle", {
-        productName,
-        category,
-        photoUrl: photoPreview,
-        price: numericPrice,
-      });
-      setCreditsEarned(earned || 100);
-
-      setStep("done");
-    } catch (err) {
-      console.error("Failed to publish listing:", err);
-    } finally {
-      setIsPublishing(false);
-    }
+    setStep("done");
   };
 
   const reset = () => {
     setStep("details");
     setProductName("");
     setCategory("");
-    setSize("");
     setPhoto(null);
     setPhotoPreview(null);
     setGradingResult(null);
+    setAICertifiedId("");
+    setCopyStatus("");
     setPrice("");
     setErrors({});
     setCreditsEarned(0);
-    setPhotoBase64(null);
   };
 
   const grading = gradingResult?.grading;
+
+  const handleCopyCertifiedId = async () => {
+    if (!aiCertifiedId) return;
+    try {
+      await navigator.clipboard.writeText(aiCertifiedId);
+      setCopyStatus("Copied!");
+      window.setTimeout(() => setCopyStatus(""), 1800);
+    } catch (err) {
+      setCopyStatus("Copy failed");
+      window.setTimeout(() => setCopyStatus(""), 1800);
+    }
+  };
 
   return (
     <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 min-h-screen text-white">
@@ -281,44 +267,6 @@ const SellPage = () => {
                   </div>
                 )}
                 {!errors.category && <div className="mb-4" />}
-                {["Clothing", "Shoes"].includes(category) && (
-                  <>
-                  <label className="block text-sm font-semibold mb-1 text-white/80">
-                  Size <span className="text-red-400">*</span>
-                  </label>
-                  <select 
-                  value={size}
-                  onChange={(e)=> {
-                    setSize(e.target.value);
-                    if(e.target.value) {
-                      setErrors((prev) => ({ ...prev, size: null }));
-                    }
-                  }}
-                  className={`w-full p-3 rounded-lg bg-white/10 border text-white mb-1 focus:outline-none focus:border-[#FF9900] transition ${
-                    errors.size ? "border-red-400" : "border-white/20"}${!size ? "text-white/40" : ""}`}
-                  >
-                    <option value="" disabled className="text-black">
-                      Select a size...
-                    </option>
-                    <option value="XS" className="text-black">XS</option>
-                    <option value="S" className="text-black">S</option>
-                    <option value="M" className="text-black">M</option>
-                    <option value="L" className="text-black">L</option>
-                    <option value="XL" className="text-black">XL</option>
-                    <option value="XXL" className="text-black">XXL</option>
-                    <option value="One Size" className="text-black">
-                      One Size
-                    </option>
-                  </select>
-                  {errors.size && (
-                    <div className="flex items-center gap-1 text-red-400 text-xs mb-4">
-                      <ExclamationCircleIcon className="h-3.5 w-3.5" />
-                      {errors.size}
-                    </div>
-                  )}
-                   {!errors.size && <div className="mb-4" />}
-                  </>
-                )}
 
                 {/* Photo */}
                 <label className="block text-sm font-semibold mb-1 text-white/80">
@@ -414,12 +362,39 @@ const SellPage = () => {
                       </div>
                     </div>
 
+                    {aiCertifiedId && (
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-900/60 border border-white/10 rounded-xl p-4 mb-6">
+                        <div>
+                          <div className="text-xs uppercase tracking-[0.2em] text-emerald-400 font-semibold mb-1">
+                            AI Certified ID
+                          </div>
+                          <div className="text-sm text-white font-semibold">{aiCertifiedId}</div>
+                        </div>
+                        <button
+                          onClick={handleCopyCertifiedId}
+                          className="px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition"
+                        >
+                          Copy ID
+                        </button>
+                      </div>
+                    )}
+                    {copyStatus && (
+                      <div className="text-xs text-emerald-300 mb-4">{copyStatus}</div>
+                    )}
+
                     <button
                       onClick={() => setStep("publish")}
                       className="w-full py-3 rounded-xl bg-emerald-500 text-white font-bold text-base hover:bg-emerald-600 transition"
                     >
                       Set Price & Publish →
                     </button>
+
+                    <Link
+  to="/passport/create"
+  className="w-full mt-4 inline-flex justify-center py-3 rounded-xl bg-[#FF9900] text-[#111] font-bold hover:bg-[#E47911] transition"
+>
+  Create Passport for Your Product
+</Link>
                   </div>
                 )}
               </div>
@@ -448,10 +423,7 @@ const SellPage = () => {
                   )}
                   <div>
                     <div className="font-bold text-base mb-1">{productName}</div>
-                    <div className="text-sm text-white/50 mb-2">
-                    {category}
-                    {size && ` • Size: ${size}`}
-                    </div>
+                    <div className="text-sm text-white/50 mb-2">{category}</div>
                     <div className="flex gap-2">
                       <GradeBadge grade={grading?.grade || "A"} />
                       <TrustScoreBadge score={grading?.trustScore || 90} />
@@ -475,17 +447,10 @@ const SellPage = () => {
 
                 <button
                   onClick={handlePublish}
-                  disabled={!price || parseFloat(price) <= 0 || isPublishing}
+                  disabled={!price || parseFloat(price) <= 0}
                   className="w-full py-4 rounded-xl bg-emerald-500 text-white font-bold text-lg hover:bg-emerald-600 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {isPublishing ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Publishing…
-                    </>
-                  ) : (
-                    "🚀 Publish Listing — Go Live"
-                  )}
+                  🚀 Publish Listing — Go Live
                 </button>
                 <p className="text-center text-xs text-white/40 mt-3">Your item will be immediately visible on the Buy page.</p>
               </div>
@@ -501,24 +466,28 @@ const SellPage = () => {
                 </motion.div>
                 <div className="text-2xl font-bold mb-2">Your item is now live!</div>
                 <div className="text-white/60 text-base mb-2">
-                  <span className="text-white font-semibold">{productName}</span>
-                  {size && (
-                    <div className="text-emerald-400 text-sm font-medium mt-1">
-                      Size: {size}
-                    </div>
-                  )}
-                  <div className="mt-2">
-                    Published at{" "}
-                    <span className="text-[#FF9900] font-bold">
-                      {GB_CURRENCY.format(parseFloat(price))}
-                    </span>
-                  </div>
-                </div>
-                  {/* <span className="text-white font-semibold">{productName}</span> has been published at{" "}
-
+                  <span className="text-white font-semibold">{productName}</span> has been published at{" "}
                   <span className="text-[#FF9900] font-bold">{GB_CURRENCY.format(parseFloat(price))}</span>
-                </div> */}
+                </div>
                 <div className="text-white/40 text-sm mb-5">It's now visible to buyers on the ReCircle Buy page.</div>
+
+                {aiCertifiedId && (
+                  <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 mb-5 text-left">
+                    <div className="text-xs uppercase tracking-[0.2em] text-emerald-400 font-semibold mb-1">
+                      AI Certified ID
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="text-sm text-white font-semibold">{aiCertifiedId}</div>
+                      <button
+                        onClick={handleCopyCertifiedId}
+                        className="px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition"
+                      >
+                        Copy ID
+                      </button>
+                    </div>
+                    {copyStatus && <div className="text-xs text-emerald-300 mt-2">{copyStatus}</div>}
+                  </div>
+                )}
 
                 {/* Credits awarded */}
                 <motion.div
