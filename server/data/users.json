@@ -4,7 +4,7 @@
     "name": "shreya jha",
     "email": "shreyaj.ug23.cs@nitp.ac.in",
     "passwordHash": "$2b$10$HJDEsaNnIlgj40IeBo1Wp.nE0kJ9wItf24Pz1CfLmm1X5KAuWZyA.",
-    "greenCredits": 470,
+    "greenCredits": 100,
     "creditHistory": [
       {
         "type": "earn",
@@ -233,6 +233,24 @@
         "amount": 100,
         "reason": "Donated , via ReCircle to undefined",
         "date": "2026-06-15T10:05:49.665Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Listed a pre-owned item on ReCircle",
+        "date": "2026-06-15T12:07:29.409Z"
+      },
+      {
+        "type": "redeem",
+        "amount": 570,
+        "reason": "Redeemed for discount",
+        "date": "2026-06-15T12:07:55.896Z"
+      },
+      {
+        "type": "earn",
+        "amount": 100,
+        "reason": "Purchased pre-owned item: Prestige Induction Cooktop",
+        "date": "2026-06-15T12:07:55.919Z"
       }
     ],
     "createdAt": "2026-06-14T13:53:38.362Z",
@@ -344,6 +362,30 @@
         "photoUrl": null,
         "price": null,
         "date": "2026-06-15T10:05:49.665Z"
+      },
+      {
+        "id": "act-1781525249409",
+        "activityType": "sell_item",
+        "reason": "Listed a pre-owned item on ReCircle",
+        "credits": 100,
+        "productName": "pencil box",
+        "category": "Other",
+        "size": null,
+        "photoUrl": "blob:http://localhost:5173/7f609bba-e2a0-4775-b99b-7d5e110ae236",
+        "price": 299,
+        "date": "2026-06-15T12:07:29.409Z"
+      },
+      {
+        "id": "act-1781525275919",
+        "activityType": "buy_resell",
+        "reason": "Purchased pre-owned item: Prestige Induction Cooktop",
+        "credits": 100,
+        "productName": "Prestige Induction Cooktop",
+        "category": "Home & Kitchen",
+        "size": null,
+        "photoUrl": null,
+        "price": 1599,
+        "date": "2026-06-15T12:07:55.919Z"
       }
     ]
   },
