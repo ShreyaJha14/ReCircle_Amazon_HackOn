@@ -52,13 +52,6 @@ const ReCircleNavBar = () => {
           ))}
         </nav>
 
-        {/* Right: Today's Returned Products */}
-        <Link to="/recircle/returns-today">
-          <GlowButton variant="primary" className="!px-4 !py-2 whitespace-nowrap">
-            <ClockIcon className="h-4 w-4" />
-            Today's Returns
-          </GlowButton>
-        </Link>
       </div>
     </header>
   );
