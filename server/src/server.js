@@ -72,19 +72,19 @@ app.use(notFound);
 app.use(errorHandler);
 
 // ── Start server ──────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n♻️  ReCircle API running on http://localhost:${PORT}`);
-  console.log(`   Environment : ${process.env.NODE_ENV || "development"}`);
-  console.log(`   AWS Region  : ${process.env.AWS_REGION || "us-east-1"}`);
-  console.log(`   CORS origin : ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
-  console.log(`\n   Routes:`);
-  console.log(`   GET  /api/health`);
-  console.log(`   POST /api/grading/grade          (multipart: photo + productName + category)`);
-  console.log(`   POST /api/routing/decide         (JSON: grade, category, ...)`);
-  console.log(`   POST /api/passport/create        (JSON: productName, grade, ...)`);
-  console.log(`   POST /api/prevention/assistant   (JSON: message, conversationHistory)`);
-  console.log(`   GET  /api/sustainability/dashboard`);
-  console.log(`   GET  /api/listings\n`);
-});
+// app.listen(PORT, () => {
+//   console.log(`\n♻️  ReCircle API running on http://localhost:${PORT}`);
+//   console.log(`   Environment : ${process.env.NODE_ENV || "development"}`);
+//   console.log(`   AWS Region  : ${process.env.AWS_REGION || "us-east-1"}`);
+//   console.log(`   CORS origin : ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
+//   console.log(`\n   Routes:`);
+//   console.log(`   GET  /api/health`);
+//   console.log(`   POST /api/grading/grade          (multipart: photo + productName + category)`);
+//   console.log(`   POST /api/routing/decide         (JSON: grade, category, ...)`);
+//   console.log(`   POST /api/passport/create        (JSON: productName, grade, ...)`);
+//   console.log(`   POST /api/prevention/assistant   (JSON: message, conversationHistory)`);
+//   console.log(`   GET  /api/sustainability/dashboard`);
+//   console.log(`   GET  /api/listings\n`);
+// });
 
 export default app;
